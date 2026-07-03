@@ -1,0 +1,8 @@
+# Secrets
+agent/auth.json
+
+# Node
+agent/npm/node_modules/
+
+# Sessions (transient)
+agent/sessions/
