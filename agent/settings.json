@@ -5,8 +5,8 @@
   "defaultModel": "deepseek-v4-pro",
   "packages": [
     "npm:@ff-labs/pi-fff",
-    "npm:@narumitw/pi-plan-mode",
-    "npm:@mammothb/pi-websearch"
+    "npm:@mammothb/pi-websearch",
+    "npm:@gotgenes/pi-subagents"
   ],
   "defaultThinkingLevel": "high",
   "terminal": {
