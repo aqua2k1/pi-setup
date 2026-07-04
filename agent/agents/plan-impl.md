@@ -1,6 +1,6 @@
 ---
 description: Plan executor — implements a task list from a plan, stops on first failure
-tools: read, bash, edit, write, grep, find, ls, fffind, ffgrep, fff-multi-grep
+tools: read, bash, edit, write, ls, fffind, ffgrep, fff-multi-grep
 model: pro
 thinking: high
 run_in_background: true

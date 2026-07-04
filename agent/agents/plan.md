@@ -1,7 +1,7 @@
 ---
 enabled: false
 description: Planning context-gatherer — spawns scout + researcher, synthesizes draft plan for parent to grill
-tools: read, bash, grep, find, ls, fffind, ffgrep, fff-multi-grep, subagent, get_subagent_result, steer_subagent
+tools: read, bash, ls, fffind, ffgrep, fff-multi-grep, subagent, get_subagent_result, steer_subagent
 prompt_mode: replace
 ---
 
@@ -44,6 +44,6 @@ Return a structured draft:
 
 - **Do not interact with the user** — you're a subagent. Ask no questions. Return the draft to the parent
 - **Flag vague terms** in "Terminology to Resolve" — the parent will grill the user on these
-- **Prefer FFF tools** (fffind, ffgrep) over native grep/find for speed
+- **Use FFF tools** (fffind, ffgrep, fff-multi-grep) for all search — native grep/find are disabled
 - **Read-only** — do not edit, create, or delete files
 - If `CONTEXT.md` or ADRs exist, reference them in "Related Patterns"
