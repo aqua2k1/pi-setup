@@ -1,0 +1,15 @@
+{
+  "provider": "searxng",
+  "searxng": {
+    "url": "http://localhost:8080",
+    "safesearch": 0,
+    "script": "~/.pi/agent/searxng.sh"
+  },
+  "timeoutMs": 25000,
+  "defaults": {
+    "numResults": 8,
+    "type": "auto",
+    "livecrawl": "fallback",
+    "contextMaxCharacters": 10000
+  }
+}

@@ -6,3 +6,6 @@ agent/npm/node_modules/
 
 # Sessions (transient)
 agent/sessions/
+
+# pi-websearch runtime PID locks
+agent/searxng-instances/

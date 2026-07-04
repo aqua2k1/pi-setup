@@ -6,7 +6,8 @@
   "packages": [
     "npm:@ff-labs/pi-fff",
     "npm:@narumitw/pi-plan-mode",
-    "npm:pi-subagents"
+    "npm:pi-subagents",
+    "npm:@mammothb/pi-websearch"
   ],
   "defaultThinkingLevel": "high"
 }
