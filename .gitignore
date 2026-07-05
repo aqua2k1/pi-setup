@@ -9,3 +9,6 @@ agent/sessions/
 
 # pi-websearch runtime PID locks
 agent/searxng-instances/
+
+# Plan files
+plan.md
