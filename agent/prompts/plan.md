@@ -1,58 +1,56 @@
 ---
-description: Full planning workflow — explore context, then grill to refine
+description: Full planning workflow — explore context, grill to refine, output and save as tasks
 argument-hint: "<requirement>"
 ---
 
-You are now in planning mode for: $ARGUMENTS
+Entering planning mode for: $ARGUMENTS
 
-## Phase 1: Gather Context
+## Phase 1: Explore
 
-Launch two agents in the **background**:
+Launch agents **sequentially**, not in parallel:
 
-- **Scout** (`subagent_type: "Scout"`): broad structural scan. Prompt: "Scan the project structure for anything relevant to: $ARGUMENTS. List key directories, config files, dependencies, and entry points."
+**Step 1 — Scout** (`subagent_type: "scout"`): broad structural scan first. Prompt: `Scan the project structure for anything relevant to: $ARGUMENTS. List key directories, config files, dependencies, and entry points.`
 
-- **Researcher** (`subagent_type: "Researcher"`): deep search. Prompt: "Deep-search the codebase for code, patterns, ADRs, or docs related to: $ARGUMENTS. Read key files and summarize relevant findings."
+Wait for Scout to complete (`get_subagent_result` + `wait: true`).
 
-**Wait for both to complete** before proceeding to Phase 2. Use `get_subagent_result` with `wait: true` to block until each finishes.
+**Step 2 — Researcher** (`subagent_type: "researcher"`): deep search **guided by Scout's findings**. Instead of a generic prompt, target the directories and patterns Scout surfaced. Prompt: `Deep-search the codebase for code, patterns, ADRs, or docs related to: $ARGUMENTS. Focus especially on [insert Scout's key directories here]. Read key files and summarize relevant findings.`
 
-## Phase 2: Grill the User
+Wait for Researcher to complete.
 
-Now that you have full context from Scout and Researcher, interview the user relentlessly about the requirement.
+If either agent returns empty, **search manually** to fill the gap.
 
-- **One question at a time.** Wait for the answer before asking the next.
-- **Challenge vague terminology.** Propose precise alternatives. "You say 'cache' — do you mean in-memory, Redis, or file-based?"
-- **Stress-test with edge cases.** Invent concrete scenarios that probe boundaries.
-- **Cross-reference with code.** If the user's claims contradict existing code or docs, surface it.
+## Phase 2: Grill
 
-For each question, provide your recommended answer.
+Use the `grill-with-docs` skill: one question at a time, challenge against the glossary, sharpen fuzzy terms, cross-reference with code, update CONTEXT.md inline, offer ADRs sparingly. Continue until all key design decisions are confirmed.
 
-## Phase 3: Document
+## Phase 3: Output & Save
 
-When Scout/Researcher complete and decisions crystallize:
-- Propose `CONTEXT.md` updates when a term is resolved (glossary only — no implementation details)
-- Offer an ADR only when: hard to reverse + surprising without context + real trade-off with genuine alternatives
+Output the plan document (Markdown) — goal, design decisions, constraints — ending with `## Tasks`.
 
-### Required Output: Tasks Section
-
-Every plan MUST end with a `## Tasks` section using this format:
+### Tasks format
 
 ```markdown
 ## Tasks
 
-### Task 1: 简短标题
-**描述:** 具体做什么，为什么
+- [ ] ### Task 1: 简短标题
+**描述:** 做什么，为什么。给新 LLM 足够信息独立执行。
+**验证:** （可选）完成标准
+**依赖:** （可选）依赖的 Task 标题
 
-### Task 2: 简短标题
-**描述:** 具体做什么，为什么
-**验证:** 如何验证完成（可选）
-**依赖:** Task 1（可选）
+- [ ] ### Task 2: 简短标题
+**描述:** ...
 ```
 
-Rules:
-- **描述** is required for every task. Be specific enough that a fresh-context LLM can execute it.
-- **验证** is optional. If a clear verification command or expected output exists, include it.
-- **依赖** is optional. List task title(s) this task depends on, for ordering context.
-- Use these exact Chinese field names: `描述:`, `验证:`, `依赖:`.
-- Task titles must be unique within the plan.
+### Save
 
-This enables `/queue-plan` to parse the plan and queue tasks via push-task.
+Write the **full plan** (including Tasks) to `.pi/plan.md`. Must use `- [ ]` markers consistently.
+
+Also ensure `.pi/` is in `.gitignore` (add if missing).
+
+### Closing
+
+```
+计划已保存到 .pi/plan.md。
+
+运行 /queue-plan 开始逐个推送任务。
+```

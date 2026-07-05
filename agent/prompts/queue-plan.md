@@ -1,60 +1,53 @@
 ---
-description: Parse the most recent plan and queue its tasks via push-task
+description: Read plan from .pi/plan.md and push the next uncompleted task
 ---
 
-## Step 1: Find the Plan
+## Trigger
 
-Scan the conversation history for the most recent plan. A plan contains a `## Tasks` section with numbered tasks in this format:
+`/queue-plan` command, and automatically after every `/finish-task` returns to the main branch.
 
-```
-### Task N: 简短标题
-**描述:** ...
-**验证:** ...（可选）
-**依赖:** ...（可选）
-```
+## Read Plan
 
-If multiple plans exist, list them briefly and ask which to implement.
+`read .pi/plan.md`. If missing → "先运行 /plan".
 
-If no plan is found, tell the user: "No plan found. Use `/plan <requirement>` first."
+## Find Next Task
 
-## Step 2: Extract Plan Context
+In the `## Tasks` section, find the **first** `- [ ]` task:
 
-Capture the plan's preamble — everything before `## Tasks` — as shared context. Every task needs to know:
-- What the overall goal is
-- Key design decisions and constraints
-- Any conventions or patterns the plan assumes
+- If it has `**依赖:** Task X`, check that Task X is marked `- [x]`
+- If dependency not yet completed → skip, continue scanning
+- If task has no 依赖 field → treat as ready
 
-Summarize this into a short context block (3-5 sentences max).
+None found → "全部任务已完成 ✓", done.
 
-## Step 3: Queue Tasks
+## Push One Task
 
-For each task in the `## Tasks` section, call `push-task`:
+**Only one. Never batch.**
 
-- **title** = `Task标题` (the title after `Task N:`)
-- **prompt** = assembled from:
+`push-task` parameters:
+
+- **title**: `Task标题` (the part after `Task N:`)
+- **prompt**:
 
 ```
-{plan context summary}
+## 计划文件
+请先 read .pi/plan.md 获取完整上下文和所有任务。
 
 ## 当前任务
-{task 描述}
+{描述内容}
 
-{optional: 验证要求: {task 验证}}
+{如果有验证: **验证:** {验证内容}}
 
-{optional: 依赖任务: {task 依赖}}
+完成后通知用户运行 /finish-task 回到主分支。
 ```
 
-**Call push-task once per task in order.** Tasks with dependencies should go after their dependencies. Do not batch multiple push-task calls in one response — call them sequentially, one per turn.
+After push → tell user: `已排队: {标题}。运行 /start-task。`
 
-## Step 4: Report
+## Auto-Continue After /finish-task
 
-After all tasks are queued, confirm:
+`/start-task` and `/finish-task` are run by the user. When back on the main branch after `/finish-task`, **automatically**:
 
-```
-N tasks queued:
-1. 标题A
-2. 标题B
-3. 标题C
-
-Run /start-task to execute one at a time, or /auto to run all hands-free.
-```
+1. `read .pi/plan.md`
+2. `edit` the just-completed task's `- [ ]` to `- [x]`
+3. Return to "Find Next Task"
+4. If found → `push-task` one. If not → "全部任务已完成 ✓"
