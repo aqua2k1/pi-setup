@@ -6,7 +6,8 @@
   "packages": [
     "npm:@ff-labs/pi-fff",
     "npm:@mammothb/pi-websearch",
-    "npm:@gotgenes/pi-subagents"
+    "npm:@gotgenes/pi-subagents",
+    "npm:pi-supergsd"
   ],
   "defaultThinkingLevel": "high",
   "terminal": {
