@@ -1,7 +1,7 @@
 ---
 description: Fast codebase exploration (read-only, FFF-accelerated)
 tools: read, bash, ls, fffind, ffgrep, fff-multi-grep
-model: flash
+model: opencode-go/deepseek-V4-flash
 prompt_mode: replace
 ---
 
