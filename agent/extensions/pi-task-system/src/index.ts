@@ -225,7 +225,7 @@ type PlanCommandAPI = Pick<ExtensionAPI, "sendUserMessage">;
 
 export function cmdPlan(pi: PlanCommandAPI): CommandOptions {
   return {
-    description: "Plan a feature: automated Scout + Researcher exploration, then interactive grilling session to create plan.md",
+    description: "Plan a feature: LLM-driven exploration via subagents, then interactive grilling session to create plan.md",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const requirement = args.trim();
       if (!requirement) {
@@ -233,59 +233,20 @@ export function cmdPlan(pi: PlanCommandAPI): CommandOptions {
         return;
       }
 
-      // ── Exploration phase (CODE-driven) ──────────────────────────
+      // ── Build prompt ─────────────────────────────────────────────
 
-      let scoutResult = "";
-      let researcherResult = "";
+      const grillPrompt = `## Exploration
 
-      try {
-        const { getSubagentsService } = await import("@gotgenes/pi-subagents");
-        const svc = getSubagentsService();
+Launch a **researcher** subagent to explore the target scope for:
 
-        if (svc) {
-          // 3a. Scout
-          ctx.ui.notify("Exploring: Scout scanning project structure...", "info");
-          const scoutId = svc.spawn(
-            "scout",
-            `Scan the project structure for anything relevant to: ${requirement}. List key directories, config files, dependencies, and entry points.`,
-            { bypassQueue: true },
-          );
-          await svc.waitForAll();
-          const scoutRecord = svc.getRecord(scoutId);
-          const scoutOk = scoutRecord?.status === "completed";
-          scoutResult = scoutRecord?.result ?? "";
+> ${requirement}
 
-          // 3b. Researcher (only if scout succeeded)
-          if (scoutOk) {
-            ctx.ui.notify("Exploring: Researcher deep-searching...", "info");
-            const researcherId = svc.spawn(
-              "researcher",
-              `Deep-search the codebase for code, patterns, ADRs, or docs related to: ${requirement}. Scout found: ${scoutResult}. Read key files and summarize relevant findings.`,
-              { bypassQueue: true },
-            );
-            await svc.waitForAll();
-            const researcherRecord = svc.getRecord(researcherId);
-            researcherResult = researcherRecord?.result ?? "";
-          }
-        }
-      } catch {
-        // Dynamic import failed or spawn threw — gracefully degrade, LLM will explore
-      }
+Read key files and summarize: domain terms, architecture, existing patterns, constraints relevant to the plan.
 
-      // ── Build exploration context ──────────────────────────────────
+For large codebases, also launch a **scout** subagent first for structural overview.
 
-      let explorationContext = "";
-      if (scoutResult || researcherResult) {
-        explorationContext = `
-## Exploration Results (auto-executed by code)
+## Plan
 
-${scoutResult ? `### Scout Scan\n${scoutResult}` : ""}
-${researcherResult ? `### Researcher Deep Search\n${researcherResult}` : ""}
----
-`;
-      }
-
-      const grillPrompt = `${explorationContext}
 Now, use the **grill-with-docs** skill to refine the plan for: ${requirement}
 
 After confirming all key design decisions one by one, call the **save_plan** tool.
