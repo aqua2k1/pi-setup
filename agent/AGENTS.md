@@ -35,6 +35,16 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
+Explore via Subagents
+Delegate codebase exploration to read-only subagents instead of streaming files into the main conversation.
+
+Before writing code:
+• Launch **Explore** for broad structural scans (directories, config, entry points).
+• Launch **researcher** for domain/docs (CONTEXT.md, ADRs, design patterns).
+• Use `run_in_background: true` to parallelize when results are independent.
+
+If the user already provided exploration context (e.g. from /plan output), use it before launching new subagents.
+
 Goal-Driven Execution
 Define success criteria. Loop until verified.
 Transform tasks into verifiable goals:
