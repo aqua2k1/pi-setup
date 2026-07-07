@@ -59,37 +59,37 @@ export function extractPlan(markdown: string): Plan {
 export function planToMarkdown(plan: Plan): string {
   const lines: string[] = [];
 
-  lines.push(`# 计划: ${plan.goal}`);
+  lines.push(`# Plan: ${plan.goal}`);
   lines.push("");
 
   if (plan.created) {
-    lines.push(`> 创建时间: ${plan.created}`);
+    lines.push(`> Created: ${plan.created}`);
     lines.push("");
   }
 
-  lines.push("## 任务");
+  lines.push("## Tasks");
   lines.push("");
 
   for (const task of plan.tasks) {
     const depSuffix =
       task.dependencies.length > 0
-        ? ` (依赖: ${task.dependencies.join(", ")})`
+        ? ` (depends: ${task.dependencies.join(", ")})`
         : "";
 
     lines.push(`- [ ] ### ${task.id}: ${task.title}${depSuffix}`);
     lines.push("");
-    lines.push(`**描述:** ${task.description}`);
+    lines.push(`**Description:** ${task.description}`);
     lines.push("");
 
     if (task.verification) {
-      lines.push(`**验证:** ${task.verification}`);
+      lines.push(`**Verification:** ${task.verification}`);
       lines.push("");
     }
   }
 
   lines.push("---");
   lines.push("");
-  lines.push("## 任务配置");
+  lines.push("## Task Config");
   lines.push("");
   lines.push("```json");
   lines.push(JSON.stringify(plan, null, 2));

@@ -1,5 +1,4 @@
 import {
-  CONFIG_DIR_NAME,
   defineTool,
   type ExtensionAPI,
   type ExtensionCommandContext,
@@ -17,7 +16,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 
 import { Box, Text, type AutocompleteItem } from "@earendil-works/pi-tui";
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { Type, type Static } from "typebox";
@@ -33,7 +32,7 @@ export function toolSavePlan(_pi: SavePlanAPI): ToolDefinition {
     name: "save_plan",
     label: "Save Plan",
     description:
-      "Save a validated plan to .pi/plan.md. Provide goal, human-readable plan_markdown, and tasks_json with the full plan configuration (goal + tasks array with id, title, description, dependencies).",
+      "Save a validated plan to plan.md. Provide goal, human-readable plan_markdown, and tasks_json with the full plan configuration (goal + tasks array with id, title, description, dependencies).",
     parameters: savePlanParameters,
     async execute(_toolCallId, params: SavePlanParams, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
@@ -63,33 +62,13 @@ export function toolSavePlan(_pi: SavePlanAPI): ToolDefinition {
         // 3. Compose markdown: human-readable part + JSON config block
         const markdown =
           params.plan_markdown +
-          `\n\n## 任务配置\n\n\`\`\`json\n${params.tasks_json}\n\`\`\`\n`;
+          `\n\n## Task Config\n\n\`\`\`json\n${params.tasks_json}\n\`\`\`\n`;
 
-        // 4. Write to .pi/plan.md (use CONFIG_DIR_NAME, not hardcoded .pi)
-        const configDir = join(ctx.cwd, CONFIG_DIR_NAME);
-        mkdirSync(configDir, { recursive: true });
-        const planPath = join(configDir, "plan.md");
+        // 4. Write to plan.md (project root)
+        const planPath = join(ctx.cwd, "plan.md");
         writeFileSync(planPath, markdown, "utf-8");
 
-        // 5. Ensure .pi/ is in .gitignore
-        const gitignorePath = join(ctx.cwd, ".gitignore");
-        const piDirEntry = `${CONFIG_DIR_NAME}/`;
-
-        let existing = "";
-        if (existsSync(gitignorePath)) {
-          existing = readFileSync(gitignorePath, "utf-8");
-        }
-
-        const hasEntry = existing
-          .split("\n")
-          .some((line) => line.trim() === piDirEntry);
-
-        if (!hasEntry) {
-          const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
-          appendFileSync(gitignorePath, `${prefix}${piDirEntry}\n`);
-        }
-
-        const displayPath = `${CONFIG_DIR_NAME}/plan.md`;
+        const displayPath = "plan.md";
         if (ctx.hasUI) {
           ctx.ui.notify(
             `Plan saved to ${displayPath} with ${plan.tasks.length} tasks.`,
@@ -97,7 +76,7 @@ export function toolSavePlan(_pi: SavePlanAPI): ToolDefinition {
           );
         }
 
-        // 6. Return success
+        // 5. Return success
         return {
           content: [
             {
@@ -246,7 +225,7 @@ type PlanCommandAPI = Pick<ExtensionAPI, "sendUserMessage">;
 
 export function cmdPlan(pi: PlanCommandAPI): CommandOptions {
   return {
-    description: "Plan a feature: automated Scout + Researcher exploration, then interactive grilling session to create .pi/plan.md",
+    description: "Plan a feature: automated Scout + Researcher exploration, then interactive grilling session to create plan.md",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const requirement = args.trim();
       if (!requirement) {
@@ -298,25 +277,25 @@ export function cmdPlan(pi: PlanCommandAPI): CommandOptions {
       let explorationContext = "";
       if (scoutResult || researcherResult) {
         explorationContext = `
-## 探索结果（由代码自动执行）
+## Exploration Results (auto-executed by code)
 
-${scoutResult ? `### Scout 扫描\n${scoutResult}` : ""}
-${researcherResult ? `### Researcher 深度搜索\n${researcherResult}` : ""}
+${scoutResult ? `### Scout Scan\n${scoutResult}` : ""}
+${researcherResult ? `### Researcher Deep Search\n${researcherResult}` : ""}
 ---
 `;
       }
 
       const grillPrompt = `${explorationContext}
-现在，使用 **grill-with-docs** skill 来完善以下需求的计划：${requirement}
+Now, use the **grill-with-docs** skill to refine the plan for: ${requirement}
 
-逐问题确认所有关键设计决策后，调用 **save_plan** 工具保存计划。
+After confirming all key design decisions one by one, call the **save_plan** tool.
 
-save_plan 参数：
-- goal: 计划目标（简短字符串）
-- plan_markdown: 完整 markdown plan 文档（目标、设计决策、约束、任务列表），不要包含任务配置 JSON block
-- tasks_json: JSON 数组字符串，每个元素：{ "id": "task-N", "title": "...", "description": "...", "verification": "...", "dependencies": ["task-M"] }
+save_plan parameters:
+- goal: Plan goal (short string)
+- plan_markdown: Full markdown plan document (goal, design decisions, constraints, task list). Do NOT include a task config JSON block — it is appended by code.
+- tasks_json: JSON array string, each element: { "id": "task-N", "title": "...", "description": "...", "verification": "...", "dependencies": ["task-M"] }
 
-注意：tasks_json 必须是合法的 JSON 字符串。dependencies 可以为空数组 []。`;
+Note: tasks_json must be a valid JSON string. dependencies can be an empty array [].`;
 
       pi.sendUserMessage(grillPrompt);
     },
@@ -411,22 +390,22 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
  */
 export function buildTaskPrompt(task: Task, plan: Plan): string {
   const lines: string[] = [];
-  lines.push(`## 计划: ${plan.goal}`);
+  lines.push(`## Plan: ${plan.goal}`);
   lines.push("");
-  lines.push("参考计划文件: `.pi/plan.md`（使用 read 工具查看完整计划）");
+  lines.push("Reference plan file: `plan.md` (use the read tool to view the full plan)");
   lines.push("");
-  lines.push(`## 当前任务: ${task.id} - ${task.title}`);
+  lines.push(`## Current Task: ${task.id} - ${task.title}`);
   lines.push("");
   lines.push(task.description);
   if (task.verification) {
     lines.push("");
-    lines.push(`### 验证条件`);
+    lines.push(`### Verification`);
     lines.push(task.verification);
   }
   if (task.dependencies.length > 0) {
     lines.push("");
-    lines.push(`### 依赖`);
-    lines.push(`以下任务已完成: ${task.dependencies.join(", ")}`);
+    lines.push(`### Dependencies`);
+    lines.push(`The following tasks are completed: ${task.dependencies.join(", ")}`);
   }
   return lines.join("\n");
 }
@@ -437,17 +416,17 @@ type PushPlanTasksCommandAPI = Pick<ExtensionAPI, "appendEntry">;
 
 export function cmdPushPlanTasks(pi: PushPlanTasksCommandAPI): CommandOptions {
   return {
-    description: "Push the next ready task from .pi/plan.md to the task queue",
+    description: "Push the next ready task from plan.md to the task queue",
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
 
       // 1. Read plan.md
-      const planPath = join(ctx.cwd, CONFIG_DIR_NAME, "plan.md");
+      const planPath = join(ctx.cwd, "plan.md");
       let markdown: string;
       try {
         markdown = readFileSync(planPath, "utf-8");
       } catch {
-        ctx.ui.notify("没有计划文件，请先运行 /plan。", "warning");
+        ctx.ui.notify("No plan file found. Run /plan first.", "warning");
         return;
       }
 
@@ -456,7 +435,7 @@ export function cmdPushPlanTasks(pi: PushPlanTasksCommandAPI): CommandOptions {
       try {
         plan = extractPlan(markdown);
       } catch (e) {
-        ctx.ui.notify(`解析计划文件失败: ${(e as Error).message}`, "error");
+        ctx.ui.notify(`Failed to parse plan file: ${(e as Error).message}`, "error");
         return;
       }
 
@@ -475,9 +454,9 @@ export function cmdPushPlanTasks(pi: PushPlanTasksCommandAPI): CommandOptions {
         });
 
         refreshTaskStatus(ctx);
-        ctx.ui.notify(`已排队: ${next.title}。运行 /start-task。`, "info");
+        ctx.ui.notify(`Queued: ${next.title}. Run /start-task.`, "info");
       } else {
-        ctx.ui.notify("全部任务已完成 ✓。", "info");
+        ctx.ui.notify("All tasks completed ✓.", "info");
       }
     },
   };
@@ -710,7 +689,7 @@ async function finishTask(
   );
   if (hasPlanTask) {
     try {
-      const planPath = join(ctx.cwd, CONFIG_DIR_NAME, "plan.md");
+      const planPath = join(ctx.cwd, "plan.md");
       const markdown = readFileSync(planPath, "utf-8");
       const plan = extractPlan(markdown);
       const completedIds = getCompletedTaskIds(ctx.sessionManager);
@@ -722,9 +701,9 @@ async function finishTask(
           planTaskId: next.id,
         });
         refreshTaskStatus(ctx, { prefix: options.statusPrefix });
-        ctx.ui.notify(`已自动排队: ${next.title}`, "info");
+        ctx.ui.notify(`Auto-queued: ${next.title}`, "info");
       } else {
-        ctx.ui.notify("全部任务已完成 ✓", "info");
+        ctx.ui.notify("All tasks completed ✓", "info");
       }
     } catch {
       // Silently fail — file read/parse errors don't affect finish
