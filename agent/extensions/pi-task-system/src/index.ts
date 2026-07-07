@@ -361,6 +361,28 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
             continue;
           }
 
+          // ── Push next plan task ─────────────────────────────
+          // At this point the task-result turn has fully completed
+          // (waited via waitForIdle) and the agent is idle on the
+          // main branch. It is safe to queue the next task.
+          try {
+            const planPath = join(ctx.cwd, "plan.md");
+            const markdown = readFileSync(planPath, "utf-8");
+            const plan = extractPlan(markdown);
+            const completedIds = getCompletedTaskIds(ctx.sessionManager);
+            const next = findNextReadyTask(plan.tasks, completedIds);
+            if (next) {
+              pi.appendEntry(TASK_ENTRY_TYPE, {
+                title: next.title,
+                prompt: buildTaskPrompt(next, plan),
+                planTaskId: next.id,
+              });
+              refreshTaskStatus(ctx, { prefix: autoStatusOptions.prefix });
+            }
+          } catch {
+            // Silently fail — file read/parse errors don't stop auto
+          }
+
           // No pending tasks and no current task
           if (!sawTaskActivity) {
             // Never had any task activity — nothing to process
@@ -682,33 +704,6 @@ async function finishTask(
 
   const label = lastAssistantId ? "Last response attached." : "No last response to attach.";
   ctx.ui.notify(`Task finished. ${label}`, "info");
-
-  // ── Auto-continue: queue next plan task ──────────────────────────
-  const hasPlanTask = ctx.sessionManager.getBranch().some(
-    (entry) => isTaskEntry(entry) && entry.data.planTaskId !== undefined,
-  );
-  if (hasPlanTask) {
-    try {
-      const planPath = join(ctx.cwd, "plan.md");
-      const markdown = readFileSync(planPath, "utf-8");
-      const plan = extractPlan(markdown);
-      const completedIds = getCompletedTaskIds(ctx.sessionManager);
-      const next = findNextReadyTask(plan.tasks, completedIds);
-      if (next) {
-        pi.appendEntry(TASK_ENTRY_TYPE, {
-          title: next.title,
-          prompt: buildTaskPrompt(next, plan),
-          planTaskId: next.id,
-        });
-        refreshTaskStatus(ctx, { prefix: options.statusPrefix });
-        ctx.ui.notify(`Auto-queued: ${next.title}`, "info");
-      } else {
-        ctx.ui.notify("All tasks completed ✓", "info");
-      }
-    } catch {
-      // Silently fail — file read/parse errors don't affect finish
-    }
-  }
 
   await restorePreviousModel(pi, taskStart, ctx);
 
