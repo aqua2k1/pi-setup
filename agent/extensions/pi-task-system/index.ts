@@ -5,7 +5,10 @@ import {
   cmdAuto,
   cmdDiscardTask,
   cmdFinishTask,
+  cmdPlan,
+  cmdPushPlanTasks,
   toolPushTask,
+  toolSavePlan,
   cmdStartTask,
   rendererTaskResult,
   setSkillsFromEvent,
@@ -15,10 +18,13 @@ import {
 
 export default function register(pi: ExtensionAPI): void {
   pi.registerTool(toolPushTask(pi));
+  pi.registerTool(toolSavePlan(pi));
   pi.registerCommand("start-task", cmdStartTask(pi));
   pi.registerCommand("discard-task", cmdDiscardTask(pi));
   pi.registerCommand("finish-task", cmdFinishTask(pi));
   pi.registerCommand("abort-task", cmdAbortTask(pi));
+  pi.registerCommand("plan", cmdPlan(pi));
+  pi.registerCommand("push-plan-tasks", cmdPushPlanTasks(pi));
   pi.registerCommand("auto", cmdAuto(pi));
 
   pi.registerMessageRenderer("task-result", rendererTaskResult);

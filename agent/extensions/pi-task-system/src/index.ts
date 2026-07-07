@@ -1,4 +1,5 @@
 import {
+  CONFIG_DIR_NAME,
   defineTool,
   type ExtensionAPI,
   type ExtensionCommandContext,
@@ -16,9 +17,111 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 
 import { Box, Text, type AutocompleteItem } from "@earendil-works/pi-tui";
 
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { Type, type Static } from "typebox";
 
+import { validatePlan } from "./plan-schema.js";
+import { extractPlan } from "./plan-parser.js";
+import { findNextReadyTask } from "./queue.js";
+import type { Task, Plan } from "./plan-schema.js";
 import { renderTextContent, taskResultTextContent } from "./text-content.js";
+
+export function toolSavePlan(_pi: SavePlanAPI): ToolDefinition {
+  return defineTool({
+    name: "save_plan",
+    label: "Save Plan",
+    description:
+      "Save a validated plan to .pi/plan.md. Provide goal, human-readable plan_markdown, and tasks_json with the full plan configuration (goal + tasks array with id, title, description, dependencies).",
+    parameters: savePlanParameters,
+    async execute(_toolCallId, params: SavePlanParams, signal, _onUpdate, ctx) {
+      if (signal?.aborted) {
+        throw new Error("Plan save aborted.");
+      }
+
+      // 1. Parse tasks_json
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(params.tasks_json);
+      } catch (e) {
+        const msg = `JSON parse error: ${(e as Error).message}`;
+        if (ctx.hasUI) {
+          ctx.ui.notify(msg, "error");
+        }
+        return {
+          content: [{ type: "text", text: msg }],
+          details: { valid: false, errors: [msg] },
+          terminate: true,
+        };
+      }
+
+      // 2. Validate the parsed plan
+      try {
+        const plan = validatePlan(parsed);
+
+        // 3. Compose markdown: human-readable part + JSON config block
+        const markdown =
+          params.plan_markdown +
+          `\n\n## 任务配置\n\n\`\`\`json\n${params.tasks_json}\n\`\`\`\n`;
+
+        // 4. Write to .pi/plan.md (use CONFIG_DIR_NAME, not hardcoded .pi)
+        const configDir = join(ctx.cwd, CONFIG_DIR_NAME);
+        mkdirSync(configDir, { recursive: true });
+        const planPath = join(configDir, "plan.md");
+        writeFileSync(planPath, markdown, "utf-8");
+
+        // 5. Ensure .pi/ is in .gitignore
+        const gitignorePath = join(ctx.cwd, ".gitignore");
+        const piDirEntry = `${CONFIG_DIR_NAME}/`;
+
+        let existing = "";
+        if (existsSync(gitignorePath)) {
+          existing = readFileSync(gitignorePath, "utf-8");
+        }
+
+        const hasEntry = existing
+          .split("\n")
+          .some((line) => line.trim() === piDirEntry);
+
+        if (!hasEntry) {
+          const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+          appendFileSync(gitignorePath, `${prefix}${piDirEntry}\n`);
+        }
+
+        const displayPath = `${CONFIG_DIR_NAME}/plan.md`;
+        if (ctx.hasUI) {
+          ctx.ui.notify(
+            `Plan saved to ${displayPath} with ${plan.tasks.length} tasks.`,
+            "info",
+          );
+        }
+
+        // 6. Return success
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Plan saved to ${displayPath} with ${plan.tasks.length} tasks.`,
+            },
+          ],
+          details: { valid: true, path: displayPath, taskCount: plan.tasks.length },
+          terminate: true,
+        };
+      } catch (e) {
+        const msg = (e as Error).message;
+        if (ctx.hasUI) {
+          ctx.ui.notify(`Plan validation failed: ${msg}`, "error");
+        }
+        return {
+          content: [{ type: "text", text: `Plan validation failed: ${msg}` }],
+          details: { valid: false, errors: [msg] },
+          terminate: true,
+        };
+      }
+    },
+  });
+}
 
 export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
   return defineTool({
@@ -66,6 +169,7 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
       pi.appendEntry(TASK_ENTRY_TYPE, {
         title,
         prompt: rewritten,
+        planTaskId: params.planTaskId,
       });
 
       if (ctx.hasUI) {
@@ -134,6 +238,87 @@ export function cmdAbortTask(pi: TaskCommandAPI): CommandOptions {
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
       await abortTask(pi, ctx);
+    },
+  };
+}
+
+type PlanCommandAPI = Pick<ExtensionAPI, "sendUserMessage">;
+
+export function cmdPlan(pi: PlanCommandAPI): CommandOptions {
+  return {
+    description: "Plan a feature: automated Scout + Researcher exploration, then interactive grilling session to create .pi/plan.md",
+    handler: async (args: string, ctx: ExtensionCommandContext) => {
+      const requirement = args.trim();
+      if (!requirement) {
+        ctx.ui.notify("Usage: /plan <requirement>", "warning");
+        return;
+      }
+
+      // ── Exploration phase (CODE-driven) ──────────────────────────
+
+      let scoutResult = "";
+      let researcherResult = "";
+
+      try {
+        const { getSubagentsService } = await import("@gotgenes/pi-subagents");
+        const svc = getSubagentsService();
+
+        if (svc) {
+          // 3a. Scout
+          ctx.ui.notify("Exploring: Scout scanning project structure...", "info");
+          const scoutId = svc.spawn(
+            "scout",
+            `Scan the project structure for anything relevant to: ${requirement}. List key directories, config files, dependencies, and entry points.`,
+            { bypassQueue: true },
+          );
+          await svc.waitForAll();
+          const scoutRecord = svc.getRecord(scoutId);
+          const scoutOk = scoutRecord?.status === "completed";
+          scoutResult = scoutRecord?.result ?? "";
+
+          // 3b. Researcher (only if scout succeeded)
+          if (scoutOk) {
+            ctx.ui.notify("Exploring: Researcher deep-searching...", "info");
+            const researcherId = svc.spawn(
+              "researcher",
+              `Deep-search the codebase for code, patterns, ADRs, or docs related to: ${requirement}. Scout found: ${scoutResult}. Read key files and summarize relevant findings.`,
+              { bypassQueue: true },
+            );
+            await svc.waitForAll();
+            const researcherRecord = svc.getRecord(researcherId);
+            researcherResult = researcherRecord?.result ?? "";
+          }
+        }
+      } catch {
+        // Dynamic import failed or spawn threw — gracefully degrade, LLM will explore
+      }
+
+      // ── Build exploration context ──────────────────────────────────
+
+      let explorationContext = "";
+      if (scoutResult || researcherResult) {
+        explorationContext = `
+## 探索结果（由代码自动执行）
+
+${scoutResult ? `### Scout 扫描\n${scoutResult}` : ""}
+${researcherResult ? `### Researcher 深度搜索\n${researcherResult}` : ""}
+---
+`;
+      }
+
+      const grillPrompt = `${explorationContext}
+现在，使用 **grill-with-docs** skill 来完善以下需求的计划：${requirement}
+
+逐问题确认所有关键设计决策后，调用 **save_plan** 工具保存计划。
+
+save_plan 参数：
+- goal: 计划目标（简短字符串）
+- plan_markdown: 完整 markdown plan 文档（目标、设计决策、约束、任务列表），不要包含任务配置 JSON block
+- tasks_json: JSON 数组字符串，每个元素：{ "id": "task-N", "title": "...", "description": "...", "verification": "...", "dependencies": ["task-M"] }
+
+注意：tasks_json 必须是合法的 JSON 字符串。dependencies 可以为空数组 []。`;
+
+      pi.sendUserMessage(grillPrompt);
     },
   };
 }
@@ -217,6 +402,87 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
   };
 }
 
+// ── buildTaskPrompt ────────────────────────────────────────────────
+
+/**
+ * Build a task execution prompt that references the plan file,
+ * includes the task description, verification conditions, and
+ * dependency context.
+ */
+export function buildTaskPrompt(task: Task, plan: Plan): string {
+  const lines: string[] = [];
+  lines.push(`## 计划: ${plan.goal}`);
+  lines.push("");
+  lines.push("参考计划文件: `.pi/plan.md`（使用 read 工具查看完整计划）");
+  lines.push("");
+  lines.push(`## 当前任务: ${task.id} - ${task.title}`);
+  lines.push("");
+  lines.push(task.description);
+  if (task.verification) {
+    lines.push("");
+    lines.push(`### 验证条件`);
+    lines.push(task.verification);
+  }
+  if (task.dependencies.length > 0) {
+    lines.push("");
+    lines.push(`### 依赖`);
+    lines.push(`以下任务已完成: ${task.dependencies.join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+// ── cmdPushPlanTasks ────────────────────────────────────────────────
+
+type PushPlanTasksCommandAPI = Pick<ExtensionAPI, "appendEntry">;
+
+export function cmdPushPlanTasks(pi: PushPlanTasksCommandAPI): CommandOptions {
+  return {
+    description: "Push the next ready task from .pi/plan.md to the task queue",
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+
+      // 1. Read plan.md
+      const planPath = join(ctx.cwd, CONFIG_DIR_NAME, "plan.md");
+      let markdown: string;
+      try {
+        markdown = readFileSync(planPath, "utf-8");
+      } catch {
+        ctx.ui.notify("没有计划文件，请先运行 /plan。", "warning");
+        return;
+      }
+
+      // 2. Extract and validate plan
+      let plan: Plan;
+      try {
+        plan = extractPlan(markdown);
+      } catch (e) {
+        ctx.ui.notify(`解析计划文件失败: ${(e as Error).message}`, "error");
+        return;
+      }
+
+      // 3. Get completed task ids
+      const completedIds = getCompletedTaskIds(ctx.sessionManager);
+
+      // 4. Find next ready task
+      const next = findNextReadyTask(plan.tasks, completedIds);
+
+      // 5. Push or notify
+      if (next) {
+        pi.appendEntry(TASK_ENTRY_TYPE, {
+          title: next.title,
+          prompt: buildTaskPrompt(next, plan),
+          planTaskId: next.id,
+        });
+
+        refreshTaskStatus(ctx);
+        ctx.ui.notify(`已排队: ${next.title}。运行 /start-task。`, "info");
+      } else {
+        ctx.ui.notify("全部任务已完成 ✓。", "info");
+      }
+    },
+  };
+}
+
 export const rendererTaskResult: MessageRenderer<{ title?: string }> = (
   message,
   _options,
@@ -278,6 +544,10 @@ export function setSkillsFromEvent(s: Skill[]): void {
 type CommandOptions = Omit<RegisteredCommand, "name" | "sourceInfo">;
 
 type PushTaskAPI = Pick<ExtensionAPI, "appendEntry">;
+
+type SavePlanAPI = object;
+
+type SavePlanParams = Static<typeof savePlanParameters>;
 
 interface AutoCommandAPI extends TaskCommandAPI {
   on(eventName: "session_shutdown", handler: () => unknown): void;
@@ -433,6 +703,33 @@ async function finishTask(
 
   const label = lastAssistantId ? "Last response attached." : "No last response to attach.";
   ctx.ui.notify(`Task finished. ${label}`, "info");
+
+  // ── Auto-continue: queue next plan task ──────────────────────────
+  const hasPlanTask = ctx.sessionManager.getBranch().some(
+    (entry) => isTaskEntry(entry) && entry.data.planTaskId !== undefined,
+  );
+  if (hasPlanTask) {
+    try {
+      const planPath = join(ctx.cwd, CONFIG_DIR_NAME, "plan.md");
+      const markdown = readFileSync(planPath, "utf-8");
+      const plan = extractPlan(markdown);
+      const completedIds = getCompletedTaskIds(ctx.sessionManager);
+      const next = findNextReadyTask(plan.tasks, completedIds);
+      if (next) {
+        pi.appendEntry(TASK_ENTRY_TYPE, {
+          title: next.title,
+          prompt: buildTaskPrompt(next, plan),
+          planTaskId: next.id,
+        });
+        refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+        ctx.ui.notify(`已自动排队: ${next.title}`, "info");
+      } else {
+        ctx.ui.notify("全部任务已完成 ✓", "info");
+      }
+    } catch {
+      // Silently fail — file read/parse errors don't affect finish
+    }
+  }
 
   await restorePreviousModel(pi, taskStart, ctx);
 
@@ -620,6 +917,7 @@ function isTaskData(value: unknown): value is TaskData {
 interface TaskData {
   title?: string;
   prompt: string;
+  planTaskId?: string;
 }
 
 function isTaskStartEntry(entry: SessionEntry): entry is TaskStartEntry {
@@ -757,6 +1055,18 @@ function getModelCompletions(argumentPrefix: string, registry: ModelRegistry): A
     }));
 }
 
+const savePlanParameters = Type.Object({
+  goal: Type.String({ description: "Plan goal (summary of what the plan aims to achieve)." }),
+  plan_markdown: Type.String({
+    description:
+      "Full markdown plan document (human-readable). Must NOT contain a task config JSON block — that is appended by code.",
+  }),
+  tasks_json: Type.String({
+    description:
+      'JSON string of the plan configuration: { goal, created?, tasks: [{ id: "task-N", title, description, verification?, dependencies: ["task-N", ...] }] }.',
+  }),
+});
+
 const pushTaskParameters = Type.Object({
   title: Type.String({
     description: "Short task title shown in status, results, and tool rendering.",
@@ -764,6 +1074,7 @@ const pushTaskParameters = Type.Object({
   prompt: Type.String({
     description: "Full prompt for the task, including all context and instructions.",
   }),
+  planTaskId: Type.Optional(Type.String()),
 });
 
 // ── Skill resolution registry ─────────────────────────────────────
@@ -776,4 +1087,32 @@ let modelRegistry: ModelRegistry | undefined;
 
 export function setModelRegistry(mr: ModelRegistry): void {
   modelRegistry = mr;
+}
+
+/**
+ * Scan the current session branch for all completed task entries with a planTaskId.
+ *
+ * A task is considered "completed" when a TASK_ENTRY_TYPE ("task") entry is followed
+ * (possibly after other entries) by a TASK_DONE_ENTRY_TYPE ("task-done") entry on the
+ * same branch. Task entries are paired LIFO with task-done entries.
+ *
+ * Only tasks with a non-undefined planTaskId are included in the returned set.
+ */
+export function getCompletedTaskIds(session: ReadonlySessionLike): Set<string> {
+  const branch = session.getBranch();
+  const completed = new Set<string>();
+  const pending: TaskEntry[] = [];
+
+  for (const entry of branch) {
+    if (isTaskEntry(entry)) {
+      pending.push(entry);
+    } else if (entry.type === "custom" && entry.customType === TASK_DONE_ENTRY_TYPE) {
+      const taskEntry = pending.pop();
+      if (taskEntry?.data.planTaskId !== undefined) {
+        completed.add(taskEntry.data.planTaskId);
+      }
+    }
+  }
+
+  return completed;
 }
