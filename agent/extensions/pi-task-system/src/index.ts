@@ -152,7 +152,7 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
       });
 
       if (ctx.hasUI) {
-        refreshTaskStatus(ctx);
+        refreshTaskUI(ctx);
         if (unresolved.length > 0) {
           const names = unresolved.map((n) => `/skill:${n}`).join(", ");
           ctx.ui.notify(
@@ -328,7 +328,7 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
       const autoStatusOptions = {
         prefix: "[auto] ",
       } satisfies TaskStatusOptions;
-      refreshTaskStatus(ctx, autoStatusOptions);
+      refreshTaskUI(ctx, autoStatusOptions);
 
       try {
         while (!stopped) {
@@ -377,7 +377,7 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
                 prompt: buildTaskPrompt(next, plan),
                 planTaskId: next.id,
               });
-              refreshTaskStatus(ctx, { prefix: autoStatusOptions.prefix });
+              refreshTaskUI(ctx, { prefix: autoStatusOptions.prefix });
             }
           } catch {
             // Silently fail — file read/parse errors don't stop auto
@@ -396,7 +396,7 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
         }
       } finally {
         stopCurrentRun = null;
-        refreshTaskStatus(ctx);
+        refreshTaskUI(ctx);
         running = false;
       }
     },
@@ -475,7 +475,7 @@ export function cmdPushPlanTasks(pi: PushPlanTasksCommandAPI): CommandOptions {
           planTaskId: next.id,
         });
 
-        refreshTaskStatus(ctx);
+        refreshTaskUI(ctx);
         ctx.ui.notify(`Queued: ${next.title}. Run /start-task.`, "info");
       } else {
         ctx.ui.notify("All tasks completed ✓.", "info");
@@ -502,14 +502,34 @@ export function updateTaskStatus(
   session: ReadonlySessionLike,
   setStatus: (key: string, value: string | undefined) => void,
   theme: TaskStatusTheme,
+  cwd: string,
   options: TaskStatusOptions = {},
 ): void {
-  const prefix = options.prefix ?? "";
+  // Try to read plan.md for progress info
+  let progressPrefix = "";
+  try {
+    const planPath = join(cwd, "plan.md");
+    const markdown = readFileSync(planPath, "utf-8");
+    const plan = extractPlan(markdown);
+    const completedIds = getCompletedTaskIds(session);
+    progressPrefix = `[${completedIds.size}/${plan.tasks.length}] `;
+  } catch {
+    // No plan or parse error — no progress prefix
+  }
+
+  const prefix = (options.prefix ?? "") + progressPrefix;
+
+  function formatTitle(data: { title?: string; planTaskId?: string }): string {
+    return data.planTaskId
+      ? `${data.planTaskId} - ${taskTitle(data.title)}`
+      : taskTitle(data.title);
+  }
+
   const pending = pendingTask(session);
   if (pending) {
     setStatus(
       "task",
-      `${prefix}${theme.fg("dim", `pending task: ${taskTitle(pending.data.title)}`)}`,
+      `${prefix}${theme.fg("dim", `pending task: ${formatTitle(pending.data)}`)}`,
     );
     return;
   }
@@ -518,7 +538,7 @@ export function updateTaskStatus(
   if (active) {
     setStatus(
       "task",
-      `${prefix}${theme.fg("dim", `current task: ${taskTitle(active.data.title)}`)}`,
+      `${prefix}${theme.fg("dim", `current task: ${formatTitle(active.data)}`)}`,
     );
     return;
   }
@@ -629,6 +649,7 @@ async function startTask(
 
   const startEntryData: TaskStartData = {
     title: taskTitle(activeTask.data.title),
+    planTaskId: activeTask.data.planTaskId,
     returnTo: departureLeafId,
   };
   if (previousModel) {
@@ -638,7 +659,7 @@ async function startTask(
 
   pi.sendUserMessage(activeTask.data.prompt);
 
-  refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+  refreshTaskUI(ctx, { prefix: options.statusPrefix });
 }
 
 async function discardTask(
@@ -654,7 +675,7 @@ async function discardTask(
   pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
   ctx.ui.notify("Task discarded.", "info");
 
-  refreshTaskStatus(ctx);
+  refreshTaskUI(ctx);
 }
 
 async function finishTask(
@@ -707,7 +728,7 @@ async function finishTask(
 
   await restorePreviousModel(pi, taskStart, ctx);
 
-  refreshTaskStatus(ctx, { prefix: options.statusPrefix });
+  refreshTaskUI(ctx, { prefix: options.statusPrefix });
 }
 
 type TaskCommandAPI = Pick<
@@ -734,7 +755,7 @@ async function abortTask(
 
   await restorePreviousModel(pi, taskStart, ctx);
 
-  refreshTaskStatus(ctx);
+  refreshTaskUI(ctx);
 }
 
 /** Restore the model that was active before a task started, if one was recorded. */
@@ -758,13 +779,23 @@ async function restorePreviousModel(
 
 type TaskActionResult = "cancelled" | void;
 
-function refreshTaskStatus(ctx: TaskStatusContext, options: TaskStatusOptions = {}): void {
+export function refreshTaskUI(ctx: TaskStatusContext, options: TaskStatusOptions = {}): void {
   if (ctx.hasUI) {
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme, options);
+    // Status bar
+    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme, ctx.cwd, options);
+
+    // Plan progress widget
+    const progress = getPlanProgress(ctx.sessionManager, ctx.cwd);
+    if (progress) {
+      const lines = renderPlanWidgetLines(progress, ctx.ui.theme);
+      ctx.ui.setWidget("plan-progress", lines, { placement: "aboveEditor" });
+    } else {
+      ctx.ui.setWidget("plan-progress", undefined);
+    }
   }
 }
 
-type TaskStatusContext = Pick<ExtensionCommandContext, "hasUI" | "sessionManager" | "ui">;
+type TaskStatusContext = Pick<ExtensionCommandContext, "hasUI" | "sessionManager" | "ui" | "cwd">;
 
 /** Type guard: is the entry an assistant message with content? */
 function isAssistantMessageEntry(
@@ -920,7 +951,8 @@ function isTaskStartData(value: unknown): value is TaskStartData {
   if (
     !isRecord(value) ||
     typeof value.returnTo !== "string" ||
-    (value.title !== undefined && typeof value.title !== "string")
+    (value.title !== undefined && typeof value.title !== "string") ||
+    (value.planTaskId !== undefined && typeof value.planTaskId !== "string")
   ) {
     return false;
   }
@@ -936,6 +968,7 @@ function isTaskStartData(value: unknown): value is TaskStartData {
 
 interface TaskStartData {
   title?: string;
+  planTaskId?: string;
   returnTo: string;
   previousModel?: { provider: string; modelId: string };
 }
@@ -1089,4 +1122,119 @@ export function getCompletedTaskIds(session: ReadonlySessionLike): Set<string> {
   }
 
   return completed;
+}
+
+// ── Plan progress ─────────────────────────────────────────────────
+
+/** Per-task status within a plan progress snapshot. */
+export interface TaskProgress {
+  id: string;
+  title: string;
+  status: "completed" | "current" | "pending";
+}
+
+/** Snapshot of plan execution progress. */
+export interface PlanProgress {
+  goal: string;
+  completed: number;
+  total: number;
+  tasks: TaskProgress[];
+}
+
+/**
+ * Read plan.md from cwd, parse it, and compute execution progress
+ * against the session's completed task entries.
+ *
+ * Returns null when:
+ *  - plan.md does not exist (file not found)
+ *  - plan.md exists but cannot be parsed (invalid JSON, validation failure)
+ */
+export function getPlanProgress(
+  session: ReadonlySessionLike,
+  cwd: string,
+): PlanProgress | null {
+  try {
+    const planPath = join(cwd, "plan.md");
+    const markdown = readFileSync(planPath, "utf-8");
+    const plan = extractPlan(markdown);
+    const completedIds = getCompletedTaskIds(session);
+    const nextReady = findNextReadyTask(plan.tasks, completedIds);
+
+    const tasks: TaskProgress[] = plan.tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      status: completedIds.has(task.id)
+        ? "completed"
+        : task.id === nextReady?.id
+          ? "current"
+          : "pending",
+    }));
+
+    return {
+      goal: plan.goal,
+      completed: completedIds.size,
+      total: plan.tasks.length,
+      tasks,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Plan widget rendering ─────────────────────────────────────────
+
+/**
+ * Render widget lines for the plan-progress widget.
+ *
+ * Returns an array of display lines (one per widget row).
+ *
+ * Format:
+ *   Plan: {goal}  [{completed}/{total}]
+ *   ✓ task-1  Title                           (completed: success)
+ *   ● task-2  Title                           (current: accent)
+ *     task-3  Title                           (pending: dim)
+ *
+ * When all tasks are completed, appends " ✓" to the header line.
+ * Task titles longer than 30 characters are truncated with "...".
+ */
+export function renderPlanWidgetLines(
+  progress: PlanProgress,
+  theme: TaskStatusTheme,
+): string[] {
+  const lines: string[] = [];
+
+  // Top line
+  const allDone = progress.completed === progress.total;
+  const suffix = allDone ? " ✓" : "";
+  lines.push(
+    `Plan: ${progress.goal}  [${progress.completed}/${progress.total}]${suffix}`,
+  );
+
+  // Task lines
+  for (const task of progress.tasks) {
+    const shortTitle =
+      task.title.length > 30
+        ? task.title.slice(0, 30) + "..."
+        : task.title;
+
+    switch (task.status) {
+      case "completed":
+        lines.push(
+          `${theme.fg("success", "✓")} ${task.id}  ${shortTitle}`,
+        );
+        break;
+      case "current":
+        lines.push(
+          `${theme.fg("accent", "●")} ${task.id}  ${shortTitle}`,
+        );
+        break;
+      case "pending":
+        lines.push(
+          theme.fg("dim", `  ${task.id}  ${shortTitle}`),
+        );
+        break;
+    }
+  }
+
+  return lines;
 }

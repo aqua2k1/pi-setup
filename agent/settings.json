@@ -1,14 +1,14 @@
 {
   "lastChangelogVersion": "0.80.3",
   "theme": "dark",
-  "defaultProvider": "deepseek",
+  "defaultProvider": "opencode-go",
   "defaultModel": "deepseek-v4-pro",
   "packages": [
     "npm:@ff-labs/pi-fff",
     "npm:@mammothb/pi-websearch",
     "npm:@gotgenes/pi-subagents"
   ],
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "xhigh",
   "terminal": {
     "showTerminalProgress": true
   }

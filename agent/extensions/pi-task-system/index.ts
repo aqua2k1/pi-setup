@@ -13,7 +13,7 @@ import {
   rendererTaskResult,
   setSkillsFromEvent,
   setModelRegistry,
-  updateTaskStatus,
+  refreshTaskUI,
 } from "./src/index.js";
 
 export default function register(pi: ExtensionAPI): void {
@@ -37,14 +37,14 @@ export default function register(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (_event, ctx) => {
     setModelRegistry(ctx.modelRegistry);
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+    refreshTaskUI(ctx);
   });
 
   pi.on("turn_end", async (_event, ctx) => {
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+    refreshTaskUI(ctx);
   });
 
   pi.on("session_tree", async (_event, ctx) => {
-    updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
+    refreshTaskUI(ctx);
   });
 }
