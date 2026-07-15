@@ -12,3 +12,6 @@ agent/searxng-instances/
 
 # Plan files
 plan.md
+
+.scratch/
+
