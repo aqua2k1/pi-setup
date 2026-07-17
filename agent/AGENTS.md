@@ -57,6 +57,12 @@ EXPECTED ARTIFACT: <relevant excerpts with file paths and line references, relev
 Use `run_in_background: true` to parallelize when results are independent.
 If the user already provided exploration context (e.g. from /plan output), use it before launching new subagents.
 
+Web Search via Subagents
+Delegate web searches to the websearch subagent instead of calling WebSearch directly.
+The websearch agent synthesizes findings across sources and returns concise, well-cited answers.
+Use it for: current information, documentation lookups, and questions needing real-time data.
+Use `run_in_background: false` (default) — web searches are fast and you need results immediately.
+
 Goal-Driven Execution
 Define success criteria. Loop until verified.
 Transform tasks into verifiable goals:
