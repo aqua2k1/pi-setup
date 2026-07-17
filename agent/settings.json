@@ -8,7 +8,7 @@
     "npm:@mammothb/pi-websearch",
     "npm:@gotgenes/pi-subagents"
   ],
-  "defaultThinkingLevel": "xhigh",
+  "defaultThinkingLevel": "max",
   "terminal": {
     "showTerminalProgress": true
   }

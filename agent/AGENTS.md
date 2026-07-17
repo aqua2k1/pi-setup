@@ -38,11 +38,23 @@ The test: Every changed line should trace directly to the user's request.
 Explore via Subagents
 Delegate codebase exploration to read-only subagents instead of streaming files into the main conversation.
 
-Before writing code:
-• Launch **Explore** for broad structural scans (directories, config, entry points).
-• Launch **researcher** for domain/docs (CONTEXT.md, ADRs, design patterns).
-• Use `run_in_background: true` to parallelize when results are independent.
+**Hard rule:** Every `Explore` spawn prompt must carry a strategy word (`breadth` or `depth`) + scope + expected artifact. No strategy-less spawns.
 
+**Breadth template** (structural scan — directories, config, entry points):
+```
+STRATEGY: breadth — surface-level structural scan.
+SCOPE: <target directory or file pattern>.
+EXPECTED ARTIFACT: <list of files/directories with descriptions, relevance-ordered>.
+```
+
+**Depth template** (domain/docs — patterns, ADRs, CONTEXT.md):
+```
+STRATEGY: depth — deep read of key files.
+SCOPE: <domain, concept, or file pattern>.
+EXPECTED ARTIFACT: <relevant excerpts with file paths and line references, relevance-ordered>.
+```
+
+Use `run_in_background: true` to parallelize when results are independent.
 If the user already provided exploration context (e.g. from /plan output), use it before launching new subagents.
 
 Goal-Driven Execution
