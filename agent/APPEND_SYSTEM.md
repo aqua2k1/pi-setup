@@ -1,5 +1,3 @@
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 Think Before Coding
 Don't assume. Don't hide confusion. Surface tradeoffs.
 Before implementing:
@@ -40,21 +38,7 @@ Delegate codebase exploration to read-only subagents instead of streaming files 
 
 **Hard rule:** Every `Explore` spawn prompt must carry a strategy word (`breadth` or `depth`) + scope + expected artifact. No strategy-less spawns.
 
-**Breadth template** (structural scan — directories, config, entry points):
-```
-STRATEGY: breadth — surface-level structural scan.
-SCOPE: <target directory or file pattern>.
-EXPECTED ARTIFACT: <list of files/directories with descriptions, relevance-ordered>.
-```
-
-**Depth template** (domain/docs — patterns, ADRs, CONTEXT.md):
-```
-STRATEGY: depth — deep read of key files.
-SCOPE: <domain, concept, or file pattern>.
-EXPECTED ARTIFACT: <relevant excerpts with file paths and line references, relevance-ordered>.
-```
-
-Use `run_in_background: true` to parallelize when results are independent.
+Use `/explore-breadth` or `/explore-depth` prompt templates to format Explore prompts. Use `run_in_background: true` to parallelize when results are independent.
 If the user already provided exploration context (e.g. from /plan output), use it before launching new subagents.
 
 Web Search via Subagents
