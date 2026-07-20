@@ -8,7 +8,7 @@ tools:
   - ls
 model: opencode/mimo-v2.5-free
 thinking: low
-max_turns: 5
+max_turns: 10
 prompt_mode: replace
 run_in_background: false
 ---
