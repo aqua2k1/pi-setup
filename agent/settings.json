@@ -6,7 +6,8 @@
   "packages": [
     "npm:@ff-labs/pi-fff",
     "npm:@mammothb/pi-websearch",
-    "npm:@gotgenes/pi-subagents"
+    "npm:@gotgenes/pi-subagents",
+    "https://github.com/hugohe3/ppt-master"
   ],
   "defaultThinkingLevel": "max",
   "terminal": {
