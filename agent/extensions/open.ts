@@ -28,15 +28,6 @@ if (platform === "linux") {
   }
 }
 
-const hasWslpath = (() => {
-  try { execSync("which wslpath", { stdio: "ignore" }); return true; } catch { return false; }
-})();
-const hasCmdExe = (() => {
-  try { execSync("which cmd.exe", { stdio: "ignore" }); return true; } catch { return false; }
-})();
-
-const wslFallbackAvailable = isWsl && hasWslpath && hasCmdExe;
-
 // ── Helpers ────────────────────────────────────────────────────────────
 
 function isUrl(input: string): boolean {
@@ -75,38 +66,26 @@ function doOpen(target: string): { ok: boolean; message: string } {
       // Windows native
       cmd = "cmd";
       args = ["/c", "start", "", target];
+    } else if (isWsl) {
+      // WSL — open directly with Windows cmd.exe
+      const winPath = target.startsWith("/") ? toWindowsPath(target) : target;
+      const proc = spawn("cmd.exe", ["/c", "start", "", winPath], {
+        detached: true,
+        stdio: "ignore",
+      });
+      proc.unref();
+      return { ok: true, message: `Opened with cmd.exe` };
     } else {
-      // Linux — try xdg-open first
+      // Linux — use xdg-open
       const proc = spawn("xdg-open", [target], {
         detached: true,
         stdio: "ignore",
       });
       proc.unref();
-
-      // If xdg-open failed and we're in WSL, fallback to cmd.exe
-      if (wslFallbackAvailable) {
-        let fallbackFired = false;
-        const tryFallback = () => {
-          if (fallbackFired) return;
-          fallbackFired = true;
-          const winPath = target.startsWith("/") ? toWindowsPath(target) : target;
-          const fallback = spawn("cmd.exe", ["/c", "start", "", winPath], {
-            detached: true,
-            stdio: "ignore",
-          });
-          fallback.unref();
-        };
-        proc.on("exit", (code) => {
-          if (code !== 0) tryFallback();
-        });
-        proc.on("error", () => tryFallback());
-        return { ok: true, message: `Opening with xdg-open (fallback: Windows)` };
-      }
-
       return { ok: true, message: `Opened with xdg-open` };
     }
 
-    // macOS / Windows native — synchronous path
+    // macOS / Windows native
     const proc = spawn(cmd, args, {
       detached: true,
       stdio: "ignore",
