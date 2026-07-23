@@ -5,11 +5,11 @@
     "safesearch": 0,
     "script": "~/.pi/agent/searxng.sh"
   },
-  "timeoutMs": 25000,
+  "timeoutMs": 45000,
   "defaults": {
-    "numResults": 8,
+    "numResults": 20,
     "type": "auto",
     "livecrawl": "fallback",
-    "contextMaxCharacters": 10000
+    "contextMaxCharacters": 80000
   }
 }
