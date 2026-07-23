@@ -85,27 +85,21 @@ function doOpen(target: string): { ok: boolean; message: string } {
 
       // If xdg-open failed and we're in WSL, fallback to cmd.exe
       if (wslFallbackAvailable) {
-        // xdg-open returns quickly even on success (it launches the app and exits).
-        // Give it a moment, then check if it's still running. If exit code signals
-        // failure, try the Windows path.
-        proc.on("exit", (code) => {
-          if (code !== 0) {
-            const winPath = target.startsWith("/") ? toWindowsPath(target) : target;
-            const fallback = spawn("cmd.exe", ["/c", "start", "", winPath], {
-              detached: true,
-              stdio: "ignore",
-            });
-            fallback.unref();
-          }
-        });
-        proc.on("error", () => {
+        let fallbackFired = false;
+        const tryFallback = () => {
+          if (fallbackFired) return;
+          fallbackFired = true;
           const winPath = target.startsWith("/") ? toWindowsPath(target) : target;
           const fallback = spawn("cmd.exe", ["/c", "start", "", winPath], {
             detached: true,
             stdio: "ignore",
           });
           fallback.unref();
+        };
+        proc.on("exit", (code) => {
+          if (code !== 0) tryFallback();
         });
+        proc.on("error", () => tryFallback());
         return { ok: true, message: `Opening with xdg-open (fallback: Windows)` };
       }
 
