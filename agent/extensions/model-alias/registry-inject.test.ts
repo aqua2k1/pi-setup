@@ -64,3 +64,33 @@ test("idempotent: existing alias entries are not duplicated", () => {
   const models = calls[0].config.models as any[];
   assert.equal(models.filter((m) => m.id === "fast").length, 1);
 });
+
+test("preserves thinkingLevelMap when re-registering concrete and alias models", () => {
+  const thinkingLevelMap = {
+    minimal: null,
+    low: null,
+    medium: null,
+    high: "high",
+    max: "max",
+  };
+  const ctx = makeCtx([
+    {
+      provider: "deepseek",
+      id: "deepseek-v4-pro",
+      name: "DeepSeek V4 Pro",
+      baseUrl: "https://api.deepseek.com",
+      thinkingLevelMap,
+      compat: { thinkingFormat: "deepseek" },
+    } as any,
+  ]);
+  const { pi, calls } = makePi();
+  injectAliases(pi, ctx, buildAliasMap({ high: "deepseek/deepseek-v4-pro" }));
+
+  const models = calls[0].config.models as any[];
+  const concrete = models.find((m) => m.id === "deepseek-v4-pro");
+  const alias = models.find((m) => m.id === "high");
+
+  assert.deepEqual(concrete?.thinkingLevelMap, thinkingLevelMap);
+  assert.deepEqual(alias?.thinkingLevelMap, thinkingLevelMap);
+  assert.deepEqual(alias?.compat, { thinkingFormat: "deepseek" });
+});

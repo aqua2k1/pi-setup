@@ -30,6 +30,10 @@ function toModelConfig(model: any) {
     maxTokens: model.maxTokens,
     headers: model.headers,
     compat: model.compat,
+    // Required so deepseek/xAI/etc keep their native thinking levels after re-registration.
+    // Without this, getSupportedThinkingLevels falls back to generic off/minimal/low/medium/high
+    // (no max), and model switches keep grok-style levels.
+    thinkingLevelMap: model.thinkingLevelMap,
   };
 }
 
