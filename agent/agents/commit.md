@@ -6,7 +6,7 @@ tools:
   - grep
   - find
   - ls
-model: opencode/mimo-v2.5-free
+model: cheap
 thinking: low
 max_turns: 10
 prompt_mode: replace

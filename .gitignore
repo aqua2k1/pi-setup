@@ -1,8 +1,13 @@
 # Secrets
 agent/auth.json
+agent/models.json
+
+# Local model alias bindings (machine-specific)
+agent/model-alias.json
 
 # Node
 agent/npm/node_modules/
+agent/extensions/**/node_modules/
 
 # Sessions (transient)
 agent/sessions/

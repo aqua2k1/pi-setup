@@ -1,7 +1,7 @@
 ---
 description: Fast codebase exploration (read-only)
 tools: read, bash, ls, find, grep
-model: opencode-go/deepseek-V4-flash
+model: fast
 prompt_mode: replace
 ---
 

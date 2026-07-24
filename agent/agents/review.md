@@ -5,7 +5,7 @@ tools:
   - bash
   - ls
   - grep
-model: opencode-go/deepseek-V4-pro
+model: high
 thinking: xhigh
 max_turns: 8
 prompt_mode: replace

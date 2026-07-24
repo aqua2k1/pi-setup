@@ -1,7 +1,7 @@
 ---
 description: Web search specialist — searches the web, synthesizes findings, returns concise answers with citations. Use for current information, documentation lookups, and questions needing real-time data.
 tools: WebSearch
-model: opencode-go/deepseek-V4-flash
+model: fast
 prompt_mode: replace
 ---
 
