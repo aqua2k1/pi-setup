@@ -1,66 +1,62 @@
-Think Before Coding
-Don't assume. Don't hide confusion. Surface tradeoffs.
-Before implementing:
+# Working style
 
-• State your assumptions explicitly. If uncertain, ask.
-• If multiple interpretations exist, present them - don't pick silently.
-• If a simpler approach exists, say so. Push back when warranted.
-• If something is unclear, stop. Name what's confusing. Ask.
+## Priority when rules conflict
+1. Don't expand scope / break working code (Surgical)
+2. Clarify when requirements are ambiguous (Think)
+3. Prefer simpler solutions in new code (Simplicity)
+4. Prefer subagents for isolation, not ceremony
 
-Simplicity First
-Minimum code that solves the problem. Nothing speculative.
-• No features beyond what was asked.
-• No abstractions for single-use code.
-• No "flexibility" or "configurability" that wasn't requested.
-• No error handling for impossible scenarios.
-• If you write 200 lines and it could be 50, rewrite it.
+## Before non-trivial work
+Non-trivial = new feature, multi-file change, or unclear requirements.
+Skip ceremony for: single-line fixes, pure renames, explicit "just do X" with one interpretation.
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-Surgical Changes
+## Implementation
+Minimum code that solves the ask. Nothing speculative.
+- No features beyond what was asked
+- No abstractions for single-use code
+- No "flexibility" or "configurability" that wasn't requested
+- No error handling for impossible scenarios
+- If you write 200 lines and it could be 50, rewrite it (new code only — don't rewrite existing code to "simplify" unless asked or your change made it necessary)
+
+Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## Surgical changes
 Touch only what you must. Clean up only your own mess.
-When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting
+- Don't refactor things that aren't broken
+- Match existing style, even if you'd do it differently
+- If you notice unrelated dead code, mention it — don't delete it
+- Remove imports/variables/functions that YOUR changes made unused
+- Don't remove pre-existing dead code unless asked
+- Tests and type updates required by your change are in scope
 
-• Don't "improve" adjacent code, comments, or formatting.
-• Don't refactor things that aren't broken.
-• Match existing style, even if you'd do it differently.
-• If you notice unrelated dead code, mention it - don't delete it.
+The test: every changed line should trace directly to the user's request.
 
-When your changes create orphans:
+## Exploration & search
+- Unfamiliar codebase: spawn Explore instead of bulk-reading into this thread.
+  Prompt must include: strategy (`breadth`|`depth`), scope, expected artifact.
+  Prefer `/explore-breadth` or `/explore-depth` templates.
+  Background only when results are independent and not needed immediately.
+  Reuse user-provided exploration context; don't re-explore.
+- Web: use websearch subagent for multi-source synthesis. Direct `WebSearch` is fine for single-fact lookups.
 
-• Remove imports/variables/functions that YOUR changes made unused.
-• Don't remove pre-existing dead code unless asked.
+## Execution
+Turn asks into verifiable outcomes. Loop until checked.
+- "Add validation" → invalid inputs rejected; valid inputs accepted
+- "Fix the bug" → repro fails before, passes after
+- "Refactor X" → behavior preserved (tests green / agreed manual check)
 
-The test: Every changed line should trace directly to the user's request.
-
-Explore via Subagents
-Delegate codebase exploration to read-only subagents instead of streaming files into the main conversation.
-
-**Hard rule:** Every `Explore` spawn prompt must carry a strategy word (`breadth` or `depth`) + scope + expected artifact. No strategy-less spawns.
-
-Use `/explore-breadth` or `/explore-depth` prompt templates to format Explore prompts. Use `run_in_background: true` to parallelize when results are independent.
-If the user already provided exploration context (e.g. from /plan output), use it before launching new subagents.
-
-Web Search via Subagents
-Delegate web searches to the websearch subagent instead of calling WebSearch directly.
-The websearch agent synthesizes findings across sources and returns concise, well-cited answers.
-Use it for: current information, documentation lookups, and questions needing real-time data.
-Use `run_in_background: false` (default) — web searches are fast and you need results immediately.
-
-Goal-Driven Execution
-Define success criteria. Loop until verified.
-Transform tasks into verifiable goals:
-
-• "Add validation" → "Write tests for invalid inputs, then make them pass"
-• "Fix the bug" → "Write a test that reproduces it, then make it pass"
-• "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-
+For multi-step work, state a brief plan:
+```
 [Step] → verify: [check]
-[Step] → verify: [check]
-[Step] → verify: [check]
+```
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+Load skills (tdd, diagnosing-bugs, codebase-design, …) instead of inventing parallel procedures.
 
-These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+## Done
+When finished: what changed · how you verified · what you deliberately left alone.
