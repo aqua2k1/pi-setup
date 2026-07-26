@@ -12,5 +12,6 @@
   "defaultThinkingLevel": "high",
   "terminal": {
     "showTerminalProgress": true
-  }
+  },
+  "treeFilterMode": "user-only"
 }
