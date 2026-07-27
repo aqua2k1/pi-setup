@@ -1,13 +1,18 @@
 # Secrets
 agent/auth.json
 agent/models.json
+agent/trust.json
 
 # Local model alias bindings (machine-specific)
 agent/model-alias.json
 
+# Chrome DevTools extension tool selection (auto-generated)
+agent/pi-chrome-devtools.json
+
 # Node
 agent/npm/node_modules/
 agent/extensions/**/node_modules/
+agent/extensions/copet
 
 # Sessions (transient)
 agent/sessions/

@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.82.0",
+  "lastChangelogVersion": "0.82.1",
   "theme": "dark",
   "defaultProvider": "opencode",
   "defaultModel": "mimo-v2.5-free",
@@ -7,9 +7,10 @@
     "npm:@mammothb/pi-websearch",
     "npm:@gotgenes/pi-subagents",
     "https://github.com/hugohe3/ppt-master",
-    "npm:@narumitw/pi-lsp"
+    "npm:@narumitw/pi-lsp",
+    "npm:@narumitw/pi-chrome-devtools"
   ],
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "max",
   "terminal": {
     "showTerminalProgress": true
   },
