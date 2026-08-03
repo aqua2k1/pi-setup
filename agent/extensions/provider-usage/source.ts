@@ -9,8 +9,9 @@
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-export const WIDGET_ID = "deepseek-balance";
-export const INTERVAL_MS = 10 * 60 * 1000;
+export const WIDGET_ID = "provider-usage";
+// 轮询间隔 1 小时；需要即时数据时用 /usage 主动刷新。
+export const INTERVAL_MS = 60 * 60 * 1000;
 // 代理路径实测单次请求 ~4.7s（EnvHttpProxyAgent 冷连接），5s 会稳定超时；15s 留足余量。
 export const TIMEOUT_MS = 15 * 1000;
 
@@ -21,6 +22,8 @@ export type Registry = ExtensionContext["modelRegistry"];
 export type UsageData = {
 	line: string;
 	windows: { label: string; percent: number }[];
+	/** 各币种余额金额（如 DeepSeek 余额），供 isWarning 判断 */
+	amounts?: number[];
 };
 
 /** 每个 provider 一个数据源；widget 互斥，由主会话模型 provider 决定显示哪个 */

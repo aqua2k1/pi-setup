@@ -6,9 +6,9 @@
  *   deepseek     → DeepSeek account balance (deepseek.ts)
  *   openai-codex → ChatGPT plan usage (chatgpt.ts, wham/usage like codex CLI)
  *
- * Polls every 10 minutes. Warning state (yellow) is abstracted per source via
- * `isWarning(data)`; concrete example: ChatGPT turns yellow when any usage
- * window reaches ≥ 80%.
+ * Polls every hour; `/usage` refreshes on demand. Warning state (yellow) is
+ * abstracted per source via `isWarning(data)`; concrete example: ChatGPT turns
+ * yellow when any usage window reaches ≥ 80%.
  *
  * Display:
  *   success:   DeepSeek: 110.00 CNY
@@ -190,6 +190,21 @@ export default function (pi: ExtensionAPI) {
 	): WidgetSource | undefined {
 		return sources.find((s) => s.provider === model?.provider);
 	}
+
+	// 未实现的 provider：无事发生（不刷新、不提示）。
+	pi.registerCommand("usage", {
+		description: "Refresh provider usage/balance widget now",
+		handler: async (_args, ctx) => {
+			if (!active || !source) return;
+			await refresh();
+			// 通知最新渲染行（成功 / stale / 错误均如实反馈）。
+			if (active && display)
+				ctx.ui.notify(
+					display.line,
+					display.isWarning ? "warning" : "info",
+				);
+		},
+	});
 
 	pi.on("session_start", async (_event, ctx) => {
 		bindCtx(ctx);

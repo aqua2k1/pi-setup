@@ -7,6 +7,8 @@ import { HttpError, type WidgetSource } from "./source.js";
 const DEEPSEEK_PROVIDER = "deepseek";
 const DEEPSEEK_BALANCE_URL = "https://api.deepseek.com/user/balance";
 const DEEPSEEK_PLACEHOLDER = "DeepSeek: 0 CNY";
+/** 预警阈值：任一币种余额低于该金额时黄色显示 */
+const DEEPSEEK_WARNING_AMOUNT = 20;
 
 type BalanceInfo = {
 	currency: string;
@@ -39,8 +41,13 @@ export const deepseekSource: WidgetSource = {
 		if (infos.length === 0) return undefined;
 
 		const line = `DeepSeek: ${infos.map((i) => `${i.total_balance} ${i.currency}`).join(" | ")}`;
-		return { line, windows: [] };
+		// 金额供 isWarning 判断（余额低于阈值 → 黄色预警）。
+		const amounts = infos
+			.map((i) => Number(i.total_balance))
+			.filter((n) => Number.isFinite(n));
+		return { line, windows: [], amounts };
 	},
-	// 余额暂无预警规则（可后续加：余额低于阈值）。
-	isWarning: () => false,
+	// 任一币种余额低于阈值 → 黄色预警。
+	isWarning: (data) =>
+		(data.amounts ?? []).some((a) => a < DEEPSEEK_WARNING_AMOUNT),
 };
