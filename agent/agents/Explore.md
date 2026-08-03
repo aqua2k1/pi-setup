@@ -1,7 +1,6 @@
 ---
 description: Fast codebase exploration (read-only)
 tools: read, bash, ls, find, grep
-model: fast
 prompt_mode: replace
 ---
 

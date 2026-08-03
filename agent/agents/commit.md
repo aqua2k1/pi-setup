@@ -6,8 +6,6 @@ tools:
   - grep
   - find
   - ls
-model: cheap
-thinking: low
 max_turns: 10
 prompt_mode: replace
 run_in_background: false

@@ -5,8 +5,6 @@ tools:
   - bash
   - ls
   - grep
-model: high
-thinking: xhigh
 max_turns: 8
 prompt_mode: replace
 ---
