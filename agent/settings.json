@@ -14,5 +14,6 @@
   "terminal": {
     "showTerminalProgress": true
   },
-  "treeFilterMode": "user-only"
+  "treeFilterMode": "user-only",
+  "hideThinkingBlock": false
 }
