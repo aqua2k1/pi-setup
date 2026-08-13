@@ -5,6 +5,10 @@ agent/trust.json
 
 # Local model alias bindings (machine-specific)
 agent/model-alias.json
+agent/subagent-model.json
+
+# Per-extension runtime state
+agent/extensions/commit/last_model.json
 
 # Chrome DevTools extension tool selection (auto-generated)
 agent/pi-chrome-devtools.json
