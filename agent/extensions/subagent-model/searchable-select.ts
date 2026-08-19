@@ -1,18 +1,17 @@
 /**
- * Searchable string picker for extension UI — mirrors /model UX:
+ * Searchable string picker for extension UI - mirrors /model UX:
  * type to fuzzy-filter, arrow keys navigate a short visible window, Enter selects.
  *
- * Pure filtering lives in filter-options.ts (unit-testable without pi packages).
- * This module is loaded only under pi (jiti resolves @earendil-works/*).
+ * Filtering uses pi-tui's native fuzzyFilter (same as /model). This module is
+ * loaded only under pi (jiti resolves @earendil-works/*); its TUI behavior is
+ * not unit-tested in isolation. The surrounding /subagent-model flow is
+ * covered by ui.test.ts via a stub UI.
  */
 
 import { DynamicBorder, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { Container, Input, Spacer, Text } from "@earendil-works/pi-tui";
-import { filterSearchableOptions } from "./filter-options.js";
+import { Container, fuzzyFilter, Input, Spacer, Text } from "@earendil-works/pi-tui";
 
 const MAX_VISIBLE = 10;
-
-export { filterSearchableOptions };
 
 /**
  * Open a searchable select dialog via ctx.ui.custom.
@@ -60,7 +59,7 @@ export async function showSearchableSelect(
     }
 
     function applyFilter() {
-      filtered = filterSearchableOptions(options, searchInput.getValue());
+      filtered = fuzzyFilter(options, searchInput.getValue(), (s) => s);
       selectedIndex = Math.min(selectedIndex, Math.max(0, filtered.length - 1));
       updateList();
     }
