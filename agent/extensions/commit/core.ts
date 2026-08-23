@@ -24,7 +24,7 @@ export const GENERATION_TIMEOUT_MS = 120_000;
 
 /** Short argv message; the details (file list + staged diff) are piped on stdin. */
 export const TASK_HEADER =
-	"为以下已暂存文件生成 commit message,文件列表和 staged diff 见 stdin";
+  "为以下已暂存文件生成 commit message,文件列表和 staged diff 见 stdin";
 
 /**
  * System prompt for the `pi -p` generator. Formerly agents/commit.md
@@ -49,28 +49,28 @@ export const COMMIT_SYSTEM_PROMPT = `You are a commit message generator. Your on
 
 /** Build the `pi -p` argv. The task itself goes on stdin (see runPiGenerate). */
 export function buildPiArgs(model: string, thinking?: string): string[] {
-	const args = [
-		"-p",
-		"--model",
-		model,
-		"--system-prompt",
-		COMMIT_SYSTEM_PROMPT,
-		"--no-tools",
-		"--no-extensions",
-		"--no-skills",
-		"--no-context-files",
-		"--no-session",
-	];
-	if (thinking !== undefined) args.push("--thinking", thinking);
-	args.push(TASK_HEADER);
-	return args;
+  const args = [
+    "-p",
+    "--model",
+    model,
+    "--system-prompt",
+    COMMIT_SYSTEM_PROMPT,
+    "--no-tools",
+    "--no-extensions",
+    "--no-skills",
+    "--no-context-files",
+    "--no-session",
+  ];
+  if (thinking !== undefined) args.push("--thinking", thinking);
+  args.push(TASK_HEADER);
+  return args;
 }
 
 export interface GenerateResult {
-	/** The generator's stdout (trimmed), when it exited 0. */
-	message: string;
-	/** Non-zero exit / spawn failure / timeout — mutually exclusive with message. */
-	error?: string;
+  /** The generator's stdout (trimmed), when it exited 0. */
+  message: string;
+  /** Non-zero exit / spawn failure / timeout — mutually exclusive with message. */
+  error?: string;
 }
 
 /**
@@ -78,127 +78,127 @@ export interface GenerateResult {
  * Resolves on exit; kills the child on timeout.
  */
 export function runPiGenerate(opts: {
-	model: string;
-	thinking?: string;
-	task: string;
-	cwd: string;
-	timeoutMs?: number;
+  model: string;
+  thinking?: string;
+  task: string;
+  cwd: string;
+  timeoutMs?: number;
 }): Promise<GenerateResult> {
-	const {
-		model,
-		thinking,
-		task,
-		cwd,
-		timeoutMs = GENERATION_TIMEOUT_MS,
-	} = opts;
-	return new Promise((resolve) => {
-		const child = spawn("pi", buildPiArgs(model, thinking), {
-			cwd,
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		let stdout = "";
-		let stderr = "";
-		let settled = false;
+  const {
+    model,
+    thinking,
+    task,
+    cwd,
+    timeoutMs = GENERATION_TIMEOUT_MS,
+  } = opts;
+  return new Promise((resolve) => {
+    const child = spawn("pi", buildPiArgs(model, thinking), {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
 
-		const settle = (result: GenerateResult) => {
-			if (settled) return;
-			settled = true;
-			clearTimeout(timer);
-			resolve(result);
-		};
+    const settle = (result: GenerateResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
 
-		const timer = setTimeout(() => {
-			child.kill("SIGKILL");
-			settle({ message: "", error: "生成超时" });
-		}, timeoutMs);
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      settle({ message: "", error: "生成超时" });
+    }, timeoutMs);
 
-		child.stdout.on("data", (chunk: Buffer) => {
-			stdout += chunk.toString();
-		});
-		child.stderr.on("data", (chunk: Buffer) => {
-			stderr += chunk.toString();
-		});
-		child.on("error", (err) => {
-			// e.g. ENOENT — the `pi` command is not on PATH.
-			settle({ message: "", error: firstLineOf(err) });
-		});
-		child.on("close", (code) => {
-			if (code === 0) {
-				settle({ message: stdout.trim() });
-				return;
-			}
-			// pi prints model-resolution failures to stdout; stderr is a fallback.
-			const detail =
-				stdout.trim().split("\n")[0] ||
-				stderr.trim().split("\n")[0] ||
-				`pi 退出码 ${code}`;
-			settle({ message: "", error: detail });
-		});
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (err) => {
+      // e.g. ENOENT — the `pi` command is not on PATH.
+      settle({ message: "", error: firstLineOf(err) });
+    });
+    child.on("close", (code) => {
+      if (code === 0) {
+        settle({ message: stdout.trim() });
+        return;
+      }
+      // pi prints model-resolution failures to stdout; stderr is a fallback.
+      const detail =
+        stdout.trim().split("\n")[0] ||
+        stderr.trim().split("\n")[0] ||
+        `pi 退出码 ${code}`;
+      settle({ message: "", error: detail });
+    });
 
-		child.stdin.write(task);
-		child.stdin.end();
-	});
+    child.stdin.write(task);
+    child.stdin.end();
+  });
 }
 
 // ---- git --------------------------------------------------------------------
 
 export interface StagedFile {
-	status: string;
-	path: string;
+  status: string;
+  path: string;
 }
 
 /** Parse `git diff --cached --name-status` output. Renames join old+new with →. */
 export function parseStagedOutput(raw: string): StagedFile[] {
-	return raw
-		.trim()
-		.split("\n")
-		.filter((line) => line.length > 0)
-		.map((line) => {
-			const parts = line.split("\t");
-			return { status: parts[0] ?? "", path: parts.slice(1).join(" → ") };
-		});
+  return raw
+    .trim()
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const parts = line.split("\t");
+      return { status: parts[0] ?? "", path: parts.slice(1).join(" → ") };
+    });
 }
 
 /** Staged files of the repo at cwd. Throws on git errors. */
 export function getStagedFiles(cwd: string): StagedFile[] {
-	const out = execFileSync("git", ["diff", "--cached", "--name-status"], {
-		cwd,
-		encoding: "utf8",
-	});
-	return parseStagedOutput(out);
+  const out = execFileSync("git", ["diff", "--cached", "--name-status"], {
+    cwd,
+    encoding: "utf8",
+  });
+  return parseStagedOutput(out);
 }
 
 /** Staged diff text, piped to the generator. */
 export function getStagedDiff(cwd: string): string {
-	return execFileSync("git", ["diff", "--cached"], {
-		cwd,
-		encoding: "utf8",
-		maxBuffer: 64 * 1024 * 1024,
-	});
+  return execFileSync("git", ["diff", "--cached"], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 /** `git commit -m`; returns the first output line. Throws on failure. */
 export function gitCommit(message: string, cwd: string): string {
-	const output = execFileSync("git", ["commit", "-m", message], {
-		cwd,
-		encoding: "utf8",
-	});
-	return output.trim().split("\n")[0] ?? "";
+  const output = execFileSync("git", ["commit", "-m", message], {
+    cwd,
+    encoding: "utf8",
+  });
+  return output.trim().split("\n")[0] ?? "";
 }
 
 // ---- prompt -----------------------------------------------------------------
 
 /** The stdin payload for the generator: file list + staged diff. */
 export function buildTask(files: StagedFile[], diff: string): string {
-	const list = files.map((file) => `- ${file.status}  ${file.path}`).join("\n");
-	return `文件列表:\n${list}\n\n<staged diff>\n${diff}`;
+  const list = files.map((file) => `- ${file.status}  ${file.path}`).join("\n");
+  return `文件列表:\n${list}\n\n<staged diff>\n${diff}`;
 }
 
 /** Strip a wrapping ``` fence (tolerates an unclosed fence). */
 export function stripCodeFences(text: string): string {
-	const trimmed = text.trim();
-	const fenced = trimmed.match(/^```[^\n]*\n([\s\S]*?)(?:```\s*)?$/);
-	return fenced ? fenced[1].trim() : trimmed;
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```[^\n]*\n([\s\S]*?)(?:```\s*)?$/);
+  return fenced ? fenced[1].trim() : trimmed;
 }
 
 // ---- last model memory ------------------------------------------------------
@@ -208,49 +208,49 @@ export function stripCodeFences(text: string): string {
 
 /** Agent dir honouring PI_CODING_AGENT_DIR (same expansion as pi-subagents). */
 export function getAgentDir(): string {
-	const configured = process.env.PI_CODING_AGENT_DIR;
-	if (configured === "~") return os.homedir();
-	if (configured?.startsWith("~/")) {
-		return path.join(os.homedir(), configured.slice(2));
-	}
-	return configured || path.join(os.homedir(), ".pi", "agent");
+  const configured = process.env.PI_CODING_AGENT_DIR;
+  if (configured === "~") return os.homedir();
+  if (configured?.startsWith("~/")) {
+    return path.join(os.homedir(), configured.slice(2));
+  }
+  return configured || path.join(os.homedir(), ".pi", "agent");
 }
 
 const LAST_MODEL_FILENAME = "last_model.json";
 
 /** <agentDir>/extensions/commit/last_model.json */
 export function lastModelPath(agentDir: string = getAgentDir()): string {
-	return path.join(agentDir, "extensions", "commit", LAST_MODEL_FILENAME);
+  return path.join(agentDir, "extensions", "commit", LAST_MODEL_FILENAME);
 }
 
 /** Last model used by /commit, or undefined when unset/missing/empty. */
 export function readLastModel(
-	agentDir: string = getAgentDir(),
+  agentDir: string = getAgentDir(),
 ): string | undefined {
-	try {
-		const raw = JSON.parse(
-			fs.readFileSync(lastModelPath(agentDir), "utf8"),
-		) as {
-			last_model?: unknown;
-		};
-		const value = raw?.last_model;
-		return typeof value === "string" && value.length > 0 ? value : undefined;
-	} catch {
-		return undefined;
-	}
+  try {
+    const raw = JSON.parse(
+      fs.readFileSync(lastModelPath(agentDir), "utf8"),
+    ) as {
+      last_model?: unknown;
+    };
+    const value = raw?.last_model;
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Persist the last chosen model (single last_model field). */
 export function writeLastModel(
-	model: string,
-	agentDir: string = getAgentDir(),
+  model: string,
+  agentDir: string = getAgentDir(),
 ): void {
-	fs.mkdirSync(path.dirname(lastModelPath(agentDir)), { recursive: true });
-	fs.writeFileSync(
-		lastModelPath(agentDir),
-		`${JSON.stringify({ last_model: model }, null, 2)}\n`,
-		"utf8",
-	);
+  fs.mkdirSync(path.dirname(lastModelPath(agentDir)), { recursive: true });
+  fs.writeFileSync(
+    lastModelPath(agentDir),
+    `${JSON.stringify({ last_model: model }, null, 2)}\n`,
+    "utf8",
+  );
 }
 
 /**
@@ -259,31 +259,31 @@ export function writeLastModel(
  * for last_model, which must always lead the picker.
  */
 export function orderModelOptions(
-	labels: string[],
-	first?: string,
-	prependIfMissing = false,
+  labels: string[],
+  first?: string,
+  prependIfMissing = false,
 ): string[] {
-	const options = [...new Set(labels)];
-	if (first === undefined) return options;
-	const index = options.indexOf(first);
-	if (index > 0) {
-		options.splice(index, 1);
-		options.unshift(first);
-	} else if (index === -1 && prependIfMissing) {
-		options.unshift(first);
-	}
-	return options;
+  const options = [...new Set(labels)];
+  if (first === undefined) return options;
+  const index = options.indexOf(first);
+  if (index > 0) {
+    options.splice(index, 1);
+    options.unshift(first);
+  } else if (index === -1 && prependIfMissing) {
+    options.unshift(first);
+  }
+  return options;
 }
 
 // ---- misc -------------------------------------------------------------------
 
 /** First line of an error's most informative text (stderr for git, else message). */
 export function firstLineOf(err: unknown): string {
-	const stderr = (err as { stderr?: Buffer | string } | undefined)?.stderr;
-	if (stderr !== undefined) {
-		return stderr.toString().trim().split("\n")[0] ?? "";
-	}
-	return err instanceof Error
-		? (err.message.split("\n")[0] ?? "")
-		: String(err);
+  const stderr = (err as { stderr?: Buffer | string } | undefined)?.stderr;
+  if (stderr !== undefined) {
+    return stderr.toString().trim().split("\n")[0] ?? "";
+  }
+  return err instanceof Error
+    ? (err.message.split("\n")[0] ?? "")
+    : String(err);
 }

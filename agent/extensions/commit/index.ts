@@ -19,107 +19,107 @@
  */
 
 import type {
-	ExtensionAPI,
-	ExtensionCommandContext,
+  ExtensionAPI,
+  ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import {
-	buildTask,
-	firstLineOf,
-	getStagedDiff,
-	getStagedFiles,
-	gitCommit,
-	readLastModel,
-	runPiGenerate,
-	type StagedFile,
-	stripCodeFences,
-	writeLastModel,
+  buildTask,
+  firstLineOf,
+  getStagedDiff,
+  getStagedFiles,
+  gitCommit,
+  readLastModel,
+  runPiGenerate,
+  type StagedFile,
+  stripCodeFences,
+  writeLastModel,
 } from "./core.ts";
 import { chooseAction, chooseModel } from "./ui.ts";
 
 /** `provider/model-id` of the current session model, if any. */
 function currentModelLabel(ctx: ExtensionCommandContext): string | undefined {
-	const model = ctx.model;
-	return model ? `${model.provider}/${model.id}` : undefined;
+  const model = ctx.model;
+  return model ? `${model.provider}/${model.id}` : undefined;
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.registerCommand("commit", {
-		description: "查看已暂存文件,选模型生成 commit message,确认后提交",
-		handler: async (_args, ctx) => {
-			if (!ctx.hasUI) {
-				ctx.ui.notify("commit 需要交互式界面", "warning");
-				return;
-			}
+  pi.registerCommand("commit", {
+    description: "查看已暂存文件,选模型生成 commit message,确认后提交",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) {
+        ctx.ui.notify("commit 需要交互式界面", "warning");
+        return;
+      }
 
-			// 1. Staged files.
-			let files: StagedFile[];
-			try {
-				files = getStagedFiles(ctx.cwd);
-			} catch (err) {
-				ctx.ui.notify(`获取暂存文件失败:${firstLineOf(err)}`, "error");
-				return;
-			}
-			if (files.length === 0) {
-				ctx.ui.notify("没有已暂存的文件", "info");
-				return;
-			}
+      // 1. Staged files.
+      let files: StagedFile[];
+      try {
+        files = getStagedFiles(ctx.cwd);
+      } catch (err) {
+        ctx.ui.notify(`获取暂存文件失败:${firstLineOf(err)}`, "error");
+        return;
+      }
+      if (files.length === 0) {
+        ctx.ui.notify("没有已暂存的文件", "info");
+        return;
+      }
 
-			// 2. Confirm the file list.
-			const listText = files
-				.map((file) => `  ${file.status.padEnd(4)} ${file.path}`)
-				.join("\n");
-			if (
-				!(await ctx.ui.confirm(`提交 ${files.length} 个暂存文件?`, listText))
-			) {
-				ctx.ui.notify("已取消,未提交", "info");
-				return;
-			}
+      // 2. Confirm the file list.
+      const listText = files
+        .map((file) => `  ${file.status.padEnd(4)} ${file.path}`)
+        .join("\n");
+      if (
+        !(await ctx.ui.confirm(`提交 ${files.length} 个暂存文件?`, listText))
+      ) {
+        ctx.ui.notify("已取消,未提交", "info");
+        return;
+      }
 
-			// 3. Pick the generation model; the last pick leads, else the current model.
-			const lastModel = readLastModel();
-			const first = lastModel ?? currentModelLabel(ctx);
-			const model = await chooseModel(ctx, first, lastModel !== undefined);
-			if (!model) {
-				ctx.ui.notify("已取消,未提交", "info");
-				return;
-			}
-			writeLastModel(model);
+      // 3. Pick the generation model; the last pick leads, else the current model.
+      const lastModel = readLastModel();
+      const first = lastModel ?? currentModelLabel(ctx);
+      const model = await chooseModel(ctx, first, lastModel !== undefined);
+      if (!model) {
+        ctx.ui.notify("已取消,未提交", "info");
+        return;
+      }
+      writeLastModel(model);
 
-			// 4. Generate (regenerate loops), confirm, then commit.
-			for (;;) {
-				ctx.ui.setStatus("commit", "生成 commit message 中…");
-				let message: string;
-				try {
-					const result = await runPiGenerate({
-						model,
-						task: buildTask(files, getStagedDiff(ctx.cwd)),
-						cwd: ctx.cwd,
-					});
-					if (result.error) throw new Error(result.error);
-					message = stripCodeFences(result.message);
-					if (message.length === 0) throw new Error("生成结果为空");
-				} catch (err) {
-					ctx.ui.setStatus("commit", undefined);
-					ctx.ui.notify(`生成失败:${firstLineOf(err)}`, "error");
-					return;
-				}
-				ctx.ui.setStatus("commit", undefined);
+      // 4. Generate (regenerate loops), confirm, then commit.
+      for (;;) {
+        ctx.ui.setStatus("commit", "生成 commit message 中…");
+        let message: string;
+        try {
+          const result = await runPiGenerate({
+            model,
+            task: buildTask(files, getStagedDiff(ctx.cwd)),
+            cwd: ctx.cwd,
+          });
+          if (result.error) throw new Error(result.error);
+          message = stripCodeFences(result.message);
+          if (message.length === 0) throw new Error("生成结果为空");
+        } catch (err) {
+          ctx.ui.setStatus("commit", undefined);
+          ctx.ui.notify(`生成失败:${firstLineOf(err)}`, "error");
+          return;
+        }
+        ctx.ui.setStatus("commit", undefined);
 
-				const action = await chooseAction(ctx, message);
-				if (action === undefined || action === "取消") {
-					ctx.ui.notify("已取消,未提交", "info");
-					return;
-				}
-				if (action === "重新生成") continue;
+        const action = await chooseAction(ctx, message);
+        if (action === undefined || action === "取消") {
+          ctx.ui.notify("已取消,未提交", "info");
+          return;
+        }
+        if (action === "重新生成") continue;
 
-				// 5. Commit directly — message already approved.
-				try {
-					ctx.ui.notify(`提交成功:${gitCommit(message, ctx.cwd)}`, "info");
-				} catch (err) {
-					ctx.ui.notify(`提交失败:${firstLineOf(err)}`, "error");
-				}
-				return;
-			}
-		},
-	});
+        // 5. Commit directly — message already approved.
+        try {
+          ctx.ui.notify(`提交成功:${gitCommit(message, ctx.cwd)}`, "info");
+        } catch (err) {
+          ctx.ui.notify(`提交失败:${firstLineOf(err)}`, "error");
+        }
+        return;
+      }
+    },
+  });
 }

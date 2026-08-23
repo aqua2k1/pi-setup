@@ -20,24 +20,24 @@ export type Registry = ExtensionContext["modelRegistry"];
 
 /** 一次拉取的结果：显示行 + 供 isWarning 判断的窗口数据 */
 export type UsageData = {
-	line: string;
-	windows: { label: string; percent: number }[];
-	/** 各币种余额金额（如 DeepSeek 余额），供 isWarning 判断 */
-	amounts?: number[];
+  line: string;
+  windows: { label: string; percent: number }[];
+  /** 各币种余额金额（如 DeepSeek 余额），供 isWarning 判断 */
+  amounts?: number[];
 };
 
 /** 每个 provider 一个数据源；widget 互斥，由主会话模型 provider 决定显示哪个 */
 export interface WidgetSource {
-	provider: string;
-	/** 首次加载 / 无数据时的占位行 */
-	placeholder: string;
-	fetch(apiKey: string, signal: AbortSignal): Promise<UsageData | undefined>;
-	/** 达到预警状态 → 黄色显示（变色抽象，各 source 实现） */
-	isWarning(data: UsageData): boolean;
+  provider: string;
+  /** 首次加载 / 无数据时的占位行 */
+  placeholder: string;
+  fetch(apiKey: string, signal: AbortSignal): Promise<UsageData | undefined>;
+  /** 达到预警状态 → 黄色显示（变色抽象，各 source 实现） */
+  isWarning(data: UsageData): boolean;
 }
 
 export class HttpError extends Error {
-	constructor(public status: number) {
-		super(`HTTP ${status}`);
-	}
+  constructor(public status: number) {
+    super(`HTTP ${status}`);
+  }
 }

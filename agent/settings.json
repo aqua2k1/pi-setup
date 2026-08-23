@@ -1,18 +1,18 @@
 {
-	"lastChangelogVersion": "0.84.2",
-	"theme": "dark",
-	"defaultProvider": "opencode-go",
-	"defaultModel": "deepseek-v4-flash",
-	"packages": [
-		"npm:@gotgenes/pi-subagents",
-		"https://github.com/hugohe3/ppt-master",
-		"npm:@narumitw/pi-chrome-devtools",
-		"npm:@juicesharp/rpiv-web-tools"
-	],
-	"defaultThinkingLevel": "max",
-	"terminal": {
-		"showTerminalProgress": true
-	},
-	"treeFilterMode": "user-only",
-	"hideThinkingBlock": false
+  "lastChangelogVersion": "0.84.2",
+  "theme": "dark",
+  "defaultProvider": "ark-byte",
+  "defaultModel": "glm-5.2",
+  "packages": [
+    "npm:@gotgenes/pi-subagents",
+    "https://github.com/hugohe3/ppt-master",
+    "npm:@narumitw/pi-chrome-devtools",
+    "npm:@juicesharp/rpiv-web-tools"
+  ],
+  "defaultThinkingLevel": "high",
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "treeFilterMode": "user-only",
+  "hideThinkingBlock": false
 }
