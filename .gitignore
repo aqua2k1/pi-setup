@@ -20,6 +20,7 @@ agent/extensions/copet
 
 # Sessions (transient)
 agent/sessions/
+pi-acp/
 
 # pi-websearch runtime PID locks
 agent/searxng-instances/
