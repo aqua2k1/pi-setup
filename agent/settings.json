@@ -2,15 +2,15 @@
   "lastChangelogVersion": "0.84.2",
   "theme": "dark",
   "defaultProvider": "opencode-go",
-  "defaultModel": "deepseek-v4-flash",
+  "defaultModel": "mimo-v2.5",
   "packages": [
-    "npm:@mammothb/pi-websearch",
     "npm:@gotgenes/pi-subagents",
     "https://github.com/hugohe3/ppt-master",
     "npm:@narumitw/pi-lsp",
-    "npm:@narumitw/pi-chrome-devtools"
+    "npm:@narumitw/pi-chrome-devtools",
+    "npm:@juicesharp/rpiv-web-tools"
   ],
-  "defaultThinkingLevel": "max",
+  "defaultThinkingLevel": "high",
   "terminal": {
     "showTerminalProgress": true
   },

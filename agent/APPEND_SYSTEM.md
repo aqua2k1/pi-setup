@@ -43,7 +43,7 @@ The test: every changed line should trace directly to the user's request.
   Prefer `/explore-breadth` or `/explore-depth` templates.
   Background only when results are independent and not needed immediately.
   Reuse user-provided exploration context; don't re-explore.
-- Web: use websearch subagent for multi-source synthesis. Direct `WebSearch` is fine for single-fact lookups.
+- Web: use websearch subagent for multi-source synthesis. Direct `web_search` is fine for single-fact lookups.
 
 ## Execution
 Turn asks into verifiable outcomes. Loop until checked.

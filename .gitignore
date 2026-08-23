@@ -2,6 +2,7 @@
 agent/auth.json
 agent/models.json
 agent/trust.json
+web-search.json
 
 # Local model alias bindings (machine-specific)
 agent/model-alias.json
@@ -21,6 +22,9 @@ agent/extensions/copet
 # Sessions (transient)
 agent/sessions/
 pi-acp/
+
+# pi-web-access runtime cache (private, contains fetched content)
+web-search-cache/
 
 # pi-websearch runtime PID locks
 agent/searxng-instances/
