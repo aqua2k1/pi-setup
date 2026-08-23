@@ -2,16 +2,17 @@
  * /context-preview — open neovim to preview the most recent provider request payload.
  *
  * Behavior:
- *   - /context-preview start  — start caching payloads from before_provider_request
- *   - /context-preview stop     — stop caching (keeps last cached payload viewable)
- *   - /context-preview status  — show enabled/disabled state
  *   - /context-preview         — open nvim -R on a temp .json file with cached payload (or empty)
+ *   - /context-preview start   — start caching payloads from before_provider_request
+ *   - /context-preview stop    — stop caching (keeps last cached payload viewable)
+ *   - /context-preview status  — show enabled/disabled state
+ *   - /context-preview help    — show usage and subcommand meanings
  *
  * The payload is the raw HTTP request body object from before_provider_request.
  * Pure read-only preview: nothing is written back to the session. The temp file
  * is deleted when nvim exits.
  *
- * Usage: /context-preview [start|stop|status]
+ * Usage: /context-preview [start|stop|status|help]  (no subcommand = preview)
  */
 
 import { spawnSync } from "node:child_process";
@@ -23,6 +24,20 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const NVIM_COMMAND = "nvim";
 const NVIM_ARGS = ["-R"];
+
+const HELP_TEXT = [
+	"/context-preview [start|stop|status|help]",
+	"",
+	"  (无参数)  用 nvim -R 只读查看最近一次 provider 请求 payload；",
+	"            未启用缓存或尚无请求时内容为空",
+	"  start     开始缓存 before_provider_request 的 payload（默认关闭）",
+	"  stop      停止缓存；已缓存内容保留，仍可打开查看",
+	"  status    显示当前缓存启用/禁用状态",
+	"  help      显示本帮助",
+	"",
+	"payload 即发送给模型 API 的原始 HTTP 请求体：model、messages、tools、",
+	"temperature 等。纯只读预览，不写入会话；临时文件在 nvim 退出后删除。",
+].join("\n");
 
 export default function (pi: ExtensionAPI) {
 	let enabled = false;
@@ -40,7 +55,8 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("context-preview", {
-		description: "Preview the provider request payload in neovim (read-only)",
+		description:
+			"Preview the provider request payload in neovim (read-only). Subcommands: start | stop | status | help",
 		handler: async (args, ctx) => {
 			if (ctx.mode !== "tui") {
 				ctx.ui.notify("/context-preview 需要交互式终端", "error");
@@ -66,6 +82,18 @@ export default function (pi: ExtensionAPI) {
 					`context-preview: ${enabled ? "已启用" : "已禁用"}`,
 					"info",
 				);
+				return;
+			}
+
+			if (sub === "help") {
+				ctx.ui.notify(HELP_TEXT, "info");
+				return;
+			}
+
+			if (sub !== "") {
+				// Unknown subcommand — show help instead of silently opening nvim.
+				ctx.ui.notify(`未知参数 "${sub}"，请参考以下用法：`, "error");
+				ctx.ui.notify(HELP_TEXT, "info");
 				return;
 			}
 
