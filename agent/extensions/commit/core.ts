@@ -23,7 +23,8 @@ import path from "node:path";
 export const GENERATION_TIMEOUT_MS = 120_000;
 
 /** Short argv message; the details (file list + staged diff) are piped on stdin. */
-export const TASK_HEADER = "为以下已暂存文件生成 commit message,文件列表和 staged diff 见 stdin";
+export const TASK_HEADER =
+	"为以下已暂存文件生成 commit message,文件列表和 staged diff 见 stdin";
 
 /**
  * System prompt for the `pi -p` generator. Formerly agents/commit.md
@@ -83,7 +84,13 @@ export function runPiGenerate(opts: {
 	cwd: string;
 	timeoutMs?: number;
 }): Promise<GenerateResult> {
-	const { model, thinking, task, cwd, timeoutMs = GENERATION_TIMEOUT_MS } = opts;
+	const {
+		model,
+		thinking,
+		task,
+		cwd,
+		timeoutMs = GENERATION_TIMEOUT_MS,
+	} = opts;
 	return new Promise((resolve) => {
 		const child = spawn("pi", buildPiArgs(model, thinking), {
 			cwd,
@@ -121,7 +128,10 @@ export function runPiGenerate(opts: {
 				return;
 			}
 			// pi prints model-resolution failures to stdout; stderr is a fallback.
-			const detail = stdout.trim().split("\n")[0] || stderr.trim().split("\n")[0] || `pi 退出码 ${code}`;
+			const detail =
+				stdout.trim().split("\n")[0] ||
+				stderr.trim().split("\n")[0] ||
+				`pi 退出码 ${code}`;
 			settle({ message: "", error: detail });
 		});
 
@@ -214,9 +224,13 @@ export function lastModelPath(agentDir: string = getAgentDir()): string {
 }
 
 /** Last model used by /commit, or undefined when unset/missing/empty. */
-export function readLastModel(agentDir: string = getAgentDir()): string | undefined {
+export function readLastModel(
+	agentDir: string = getAgentDir(),
+): string | undefined {
 	try {
-		const raw = JSON.parse(fs.readFileSync(lastModelPath(agentDir), "utf8")) as {
+		const raw = JSON.parse(
+			fs.readFileSync(lastModelPath(agentDir), "utf8"),
+		) as {
 			last_model?: unknown;
 		};
 		const value = raw?.last_model;
@@ -227,11 +241,14 @@ export function readLastModel(agentDir: string = getAgentDir()): string | undefi
 }
 
 /** Persist the last chosen model (single last_model field). */
-export function writeLastModel(model: string, agentDir: string = getAgentDir()): void {
+export function writeLastModel(
+	model: string,
+	agentDir: string = getAgentDir(),
+): void {
 	fs.mkdirSync(path.dirname(lastModelPath(agentDir)), { recursive: true });
 	fs.writeFileSync(
 		lastModelPath(agentDir),
-		JSON.stringify({ last_model: model }, null, 2) + "\n",
+		`${JSON.stringify({ last_model: model }, null, 2)}\n`,
 		"utf8",
 	);
 }
@@ -266,5 +283,7 @@ export function firstLineOf(err: unknown): string {
 	if (stderr !== undefined) {
 		return stderr.toString().trim().split("\n")[0] ?? "";
 	}
-	return err instanceof Error ? (err.message.split("\n")[0] ?? "") : String(err);
+	return err instanceof Error
+		? (err.message.split("\n")[0] ?? "")
+		: String(err);
 }

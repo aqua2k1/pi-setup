@@ -18,7 +18,10 @@
  * (pi-free git + generation logic, unit-tested).
  */
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
 import {
 	buildTask,
 	firstLineOf,
@@ -27,9 +30,9 @@ import {
 	gitCommit,
 	readLastModel,
 	runPiGenerate,
+	type StagedFile,
 	stripCodeFences,
 	writeLastModel,
-	type StagedFile,
 } from "./core.ts";
 import { chooseAction, chooseModel } from "./ui.ts";
 
@@ -65,7 +68,9 @@ export default function (pi: ExtensionAPI) {
 			const listText = files
 				.map((file) => `  ${file.status.padEnd(4)} ${file.path}`)
 				.join("\n");
-			if (!(await ctx.ui.confirm(`提交 ${files.length} 个暂存文件?`, listText))) {
+			if (
+				!(await ctx.ui.confirm(`提交 ${files.length} 个暂存文件?`, listText))
+			) {
 				ctx.ui.notify("已取消,未提交", "info");
 				return;
 			}

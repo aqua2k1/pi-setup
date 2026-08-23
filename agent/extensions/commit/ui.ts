@@ -6,7 +6,10 @@
  * logic) and index.ts (command flow).
  */
 
-import { DynamicBorder, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import {
+	DynamicBorder,
+	type ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
 import {
 	Container,
 	fuzzyFilter,
@@ -86,22 +89,29 @@ async function searchableSelect(
 					),
 				);
 				const end = Math.min(start + MAX_VISIBLE, filtered.length);
-				for (let i = start; i < end; i++) {
-					const item = filtered[i]!;
+				for (const [offset, item] of filtered.slice(start, end).entries()) {
+					const i = start + offset;
 					const line =
 						i === selectedIndex ? accent(`→ ${item}`) : `  ${text(item)}`;
 					listContainer.addChild(new Text(line, 1, 0));
 				}
 				if (start > 0 || end < filtered.length) {
 					listContainer.addChild(
-						new Text(muted(`  (${selectedIndex + 1}/${filtered.length})`), 1, 0),
+						new Text(
+							muted(`  (${selectedIndex + 1}/${filtered.length})`),
+							1,
+							0,
+						),
 					);
 				}
 			}
 
 			function applyFilter() {
 				filtered = fuzzyFilter(options, searchInput.getValue(), (s) => s);
-				selectedIndex = Math.min(selectedIndex, Math.max(0, filtered.length - 1));
+				selectedIndex = Math.min(
+					selectedIndex,
+					Math.max(0, filtered.length - 1),
+				);
 				updateList();
 			}
 

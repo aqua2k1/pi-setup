@@ -5,7 +5,14 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -117,7 +124,10 @@ test("buildTask: lists staged files and includes the diff", () => {
 
 test("COMMIT_SYSTEM_PROMPT: carries the Conventional Commits rules", () => {
 	assert.match(COMMIT_SYSTEM_PROMPT, /type\(scope\): description/);
-	assert.match(COMMIT_SYSTEM_PROMPT, /feat.*fix.*chore.*docs.*style.*refactor.*test.*ci.*perf/s);
+	assert.match(
+		COMMIT_SYSTEM_PROMPT,
+		/feat.*fix.*chore.*docs.*style.*refactor.*test.*ci.*perf/s,
+	);
 	assert.match(COMMIT_SYSTEM_PROMPT, /72 characters/);
 	assert.match(COMMIT_SYSTEM_PROMPT, /Output ONLY the commit message text/);
 });
@@ -140,10 +150,7 @@ test("buildPiArgs: lean non-interactive pi invocation, model + header", () => {
 
 test("buildPiArgs: thinking flag before header when provided", () => {
 	const args = buildPiArgs("p/m", "high");
-	assert.deepEqual(
-		args.slice(-3),
-		["--thinking", "high", TASK_HEADER],
-	);
+	assert.deepEqual(args.slice(-3), ["--thinking", "high", TASK_HEADER]);
 });
 
 // ---- runPiGenerate ----------------------------------------------------------
@@ -264,7 +271,10 @@ test("orderModelOptions: absent first only prepends with prependIfMissing", () =
 // ---- last model memory --------------------------------------------------------
 
 /** Set PI_CODING_AGENT_DIR for a test, restore afterwards. */
-async function withAgentDir(dir: string, fn: () => Promise<void>): Promise<void> {
+async function withAgentDir(
+	dir: string,
+	fn: () => Promise<void>,
+): Promise<void> {
 	const prev = process.env.PI_CODING_AGENT_DIR;
 	process.env.PI_CODING_AGENT_DIR = dir;
 	try {

@@ -199,10 +199,7 @@ export default function (pi: ExtensionAPI) {
 			await refresh();
 			// 通知最新渲染行（成功 / stale / 错误均如实反馈）。
 			if (active && display)
-				ctx.ui.notify(
-					display.line,
-					display.isWarning ? "warning" : "info",
-				);
+				ctx.ui.notify(display.line, display.isWarning ? "warning" : "info");
 		},
 	});
 
