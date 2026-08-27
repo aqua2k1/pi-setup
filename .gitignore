@@ -1,6 +1,5 @@
 # Secrets
 agent/auth.json
-agent/models.json
 agent/trust.json
 web-search.json
 
