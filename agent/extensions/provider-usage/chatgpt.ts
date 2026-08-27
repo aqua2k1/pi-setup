@@ -26,10 +26,7 @@ type WhamWindow = {
 
 type WhamResponse = {
   plan_type?: string;
-  rate_limit?: {
-    primary_window?: WhamWindow;
-    secondary_window?: WhamWindow;
-  } | null;
+  rate_limit?: Record<string, unknown> | null;
 };
 
 function decodeAccountId(token: string): string | undefined {
@@ -58,10 +55,20 @@ function windowLabel(seconds: number): string {
 function formatReset(resetAtSec: number): string {
   const minutes = Math.round((resetAtSec * 1000 - Date.now()) / 60_000);
   if (minutes <= 0) return "";
-  if (minutes < 60) return `resets in ${minutes}m`;
+  if (minutes < 60) return `${minutes}m`;
   const hours = minutes / 60;
-  if (hours < 24) return `resets in ${Math.round(hours)}h`;
-  return `resets in ${Math.round(hours / 24)}d`;
+  if (hours < 24) return `${Math.round(hours)}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+function isWhamWindow(value: unknown): value is WhamWindow {
+  if (typeof value !== "object" || value === null) return false;
+  const window = value as Record<string, unknown>;
+  return (
+    typeof window.used_percent === "number" &&
+    typeof window.limit_window_seconds === "number" &&
+    typeof window.reset_at === "number"
+  );
 }
 
 export const chatgptSource: WidgetSource = {
@@ -84,12 +91,18 @@ export const chatgptSource: WidgetSource = {
     if (!res.ok) throw new HttpError(res.status);
 
     const data = (await res.json()) as WhamResponse | null;
+    const rateLimit = data?.rate_limit;
     const windows = [
-      data?.rate_limit?.primary_window,
-      data?.rate_limit?.secondary_window,
+      rateLimit?.primary_window,
+      rateLimit?.secondary_window,
+      ...Object.entries(rateLimit ?? {})
+        .filter(
+          ([name]) => name !== "primary_window" && name !== "secondary_window",
+        )
+        .map(([, value]) => value),
     ]
-      // 响应里窗口可能是 null（如 free 账号的 secondary_window），必须同时滤掉 null。
-      .filter((w): w is WhamWindow => w !== undefined && w !== null)
+      // 只保留窗口对象，兼容响应中出现的额外窗口（如 monthly_window）。
+      .filter(isWhamWindow)
       .map((w) => ({
         label: windowLabel(w.limit_window_seconds),
         percent: w.used_percent,
@@ -101,7 +114,13 @@ export const chatgptSource: WidgetSource = {
     // 显示计划类型（free/plus...），缺失时省略前缀。
     const plan = data.plan_type?.trim() ? data.plan_type.trim() : undefined;
     const prefix = plan ? `ChatGPT ${plan}` : "ChatGPT";
-    const line = [prefix, usage, windows[0].reset].filter(Boolean).join(" · ");
+    const resets = windows
+      .map((w) => w.reset)
+      .filter(Boolean)
+      .join("/");
+    const line = [prefix, usage, resets ? `resets in ${resets}` : ""]
+      .filter(Boolean)
+      .join(" · ");
     return { line, windows };
   },
   // 具体示例：任一窗口使用率 ≥ 80% 进入预警状态（黄色显示）。

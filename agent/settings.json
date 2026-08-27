@@ -1,18 +1,20 @@
 {
-  "lastChangelogVersion": "0.84.2",
+  "lastChangelogVersion": "0.84.3",
   "theme": "dark",
-  "defaultProvider": "ark-byte",
-  "defaultModel": "glm-5.2",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-luna",
   "packages": [
     "npm:@gotgenes/pi-subagents",
-    "https://github.com/hugohe3/ppt-master",
     "npm:@narumitw/pi-chrome-devtools",
     "npm:@juicesharp/rpiv-web-tools"
   ],
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "max",
   "terminal": {
     "showTerminalProgress": true
   },
   "treeFilterMode": "user-only",
-  "hideThinkingBlock": false
+  "hideThinkingBlock": false,
+  "compaction": {
+    "enabled": true
+  }
 }
