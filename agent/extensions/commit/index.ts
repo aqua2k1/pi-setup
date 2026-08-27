@@ -43,9 +43,27 @@ function currentModelLabel(ctx: ExtensionCommandContext): string | undefined {
 }
 
 export default function (pi: ExtensionAPI) {
+  let quitAfterStartupCommit = false;
+
+  pi.registerFlag("commit", {
+    description: "Run the commit flow at startup",
+    type: "boolean",
+    default: false,
+  });
+
+  pi.on("session_start", (event) => {
+    if (event.reason !== "startup" || pi.getFlag("commit") !== true) return;
+
+    quitAfterStartupCommit = true;
+    pi.sendUserMessage("/commit", { expandPromptTemplates: true });
+  });
+
   pi.registerCommand("commit", {
     description: "查看已暂存文件,选模型生成 commit message,确认后提交",
     handler: async (_args, ctx) => {
+      const shouldQuitAfterCommit = quitAfterStartupCommit;
+      quitAfterStartupCommit = false;
+
       if (!ctx.hasUI) {
         ctx.ui.notify("commit 需要交互式界面", "warning");
         return;
@@ -115,6 +133,7 @@ export default function (pi: ExtensionAPI) {
         // 5. Commit directly — message already approved.
         try {
           ctx.ui.notify(`提交成功:${gitCommit(message, ctx.cwd)}`, "info");
+          if (shouldQuitAfterCommit) ctx.shutdown();
         } catch (err) {
           ctx.ui.notify(`提交失败:${firstLineOf(err)}`, "error");
         }
