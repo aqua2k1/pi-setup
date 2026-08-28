@@ -13,8 +13,11 @@ agent/extensions/commit/last_model.json
 # Chrome DevTools extension tool selection (auto-generated)
 agent/pi-chrome-devtools.json
 
+# Git
+agent/git/
+
 # Node
-agent/npm/node_modules/
+agent/npm/
 agent/extensions/**/node_modules/
 agent/extensions/copet
 
