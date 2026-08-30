@@ -13,6 +13,7 @@ import {
   scanSessionFiles,
   totalsForDate,
   totalsForModel,
+  totalsForTimeRange,
 } from "./core.ts";
 
 function usage(
@@ -147,6 +148,37 @@ test("addSessionEntry ignores messages without billable usage", () => {
     false,
   );
   assert.equal(snapshot.usageEntries, 0);
+});
+
+test("totalsForTimeRange supports rolling windows across dates", () => {
+  const end = new Date("2026-01-31T12:00:00.000Z").getTime();
+  const snapshot = aggregateEntries([
+    assistantEntry(
+      "inside",
+      "2026-01-30T13:00:00.000Z",
+      "p",
+      "m",
+      usage(10, 2, 0.01),
+    ),
+    assistantEntry(
+      "outside",
+      "2026-01-30T11:00:00.000Z",
+      "p",
+      "m",
+      usage(20, 2, 0.02),
+    ),
+  ]);
+
+  assertTotals(
+    totalsForTimeRange(snapshot, end - 24 * 60 * 60 * 1000, end),
+    12,
+    0.01,
+  );
+  assertTotals(
+    totalsForTimeRange(snapshot, end - 30 * 24 * 60 * 60 * 1000, end, "p/m"),
+    34,
+    0.03,
+  );
 });
 
 test("scanSessionFiles counts copied fork history once", async () => {

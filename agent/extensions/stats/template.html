@@ -53,9 +53,6 @@
     .generated { white-space: nowrap; font-size: 12px; }
 
     .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
       margin-bottom: 18px;
     }
 
@@ -65,9 +62,20 @@
       background: var(--panel);
     }
 
-    .summary-card { padding: 16px 18px; }
-    .summary-label { color: var(--muted); font-size: 12px; }
-    .summary-value { margin-top: 4px; font-size: 24px; font-weight: 650; }
+    .summary-card { padding: 8px 18px; }
+    .summary-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: baseline;
+      gap: 20px;
+      min-height: 44px;
+      padding: 10px 0;
+    }
+
+    .summary-row + .summary-row { border-top: 1px solid var(--panel-border); }
+    .summary-period { color: var(--muted); font-size: 12px; }
+    .summary-value { font-size: 22px; font-weight: 650; white-space: nowrap; }
+    .summary-cost { color: var(--muted); font-size: 14px; white-space: nowrap; }
 
     .panel { padding: 18px; margin-bottom: 18px; }
     .panel-header {
@@ -121,6 +129,8 @@
     .heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
     .calendar { min-width: 760px; }
     .month-row {
+      position: relative;
+      z-index: 1;
       display: grid;
       grid-template-columns: 34px repeat(53, minmax(10px, 1fr));
       gap: 4px;
@@ -133,10 +143,16 @@
       display: grid;
       grid-column: 2 / -1;
       grid-template-columns: repeat(53, minmax(10px, 1fr));
+      grid-template-rows: 16px;
       gap: 4px;
+      min-height: 16px;
     }
 
-    .month-label { overflow: visible; white-space: nowrap; }
+    .month-label {
+      grid-row: 1;
+      overflow: visible;
+      white-space: nowrap;
+    }
     .calendar-body { display: grid; grid-template-columns: 34px 1fr; gap: 0; }
     .weekday-labels {
       display: grid;
@@ -189,7 +205,6 @@
       main { width: min(100% - 20px, 1120px); padding-top: 22px; }
       header { display: block; }
       .generated { margin-top: 6px; }
-      .summary-grid { grid-template-columns: 1fr; }
       .panel { padding: 14px; }
       .panel-header { align-items: flex-start; flex-direction: column; }
       select { max-width: 100%; width: 100%; }
@@ -208,12 +223,21 @@
 
     <section class="summary-grid" aria-label="Usage summary">
       <div class="summary-card">
-        <div class="summary-label" id="summary-token-label">Total tokens</div>
-        <div class="summary-value" id="summary-tokens"></div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label" id="summary-cost-label">Total cost</div>
-        <div class="summary-value" id="summary-cost"></div>
+        <div class="summary-row">
+          <span class="summary-period">Total</span>
+          <span class="summary-value" id="summary-tokens"></span>
+          <span class="summary-cost" id="summary-cost"></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-period">Last 30 days</span>
+          <span class="summary-value" id="summary-30d-tokens"></span>
+          <span class="summary-cost" id="summary-30d-cost"></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-period">Last 24 hours</span>
+          <span class="summary-value" id="summary-24h-tokens"></span>
+          <span class="summary-cost" id="summary-24h-cost"></span>
+        </div>
       </div>
     </section>
 
@@ -264,11 +288,19 @@
     (() => {
       const ALL_MODELS = "__all__";
       const data = JSON.parse(document.getElementById("stats-data").textContent);
-      const modelMap = new Map(data.models.map((entry) => [entry.model, entry]));
       const dateMap = new Map(
         data.dates.map((entry) => [
           entry.day,
           new Map(entry.models.map((model) => [model.model, model])),
+        ]),
+      );
+      const periodMap = new Map(
+        Object.entries(data.periods).map(([name, period]) => [
+          name,
+          {
+            total: period.total,
+            models: new Map(period.models.map((model) => [model.model, model])),
+          },
         ]),
       );
       const filter = document.getElementById("model-filter");
@@ -295,8 +327,11 @@
         return { totalTokens: 0, cost: 0 };
       }
 
-      function selectedTotals(model) {
-        return model === ALL_MODELS ? data.total : (modelMap.get(model) || emptyTotals());
+      function periodTotals(period, model) {
+        const selectedPeriod = periodMap.get(period);
+        if (!selectedPeriod) return emptyTotals();
+        if (model === ALL_MODELS) return selectedPeriod.total;
+        return selectedPeriod.models.get(model) || emptyTotals();
       }
 
       function dailyTotals(day, model) {
@@ -315,11 +350,16 @@
       }
 
       function renderSummary(model) {
-        const totals = selectedTotals(model);
-        document.getElementById("summary-token-label").textContent = model === ALL_MODELS ? "Total tokens" : `${model} tokens`;
-        document.getElementById("summary-cost-label").textContent = model === ALL_MODELS ? "Total cost" : `${model} cost`;
-        document.getElementById("summary-tokens").textContent = formatTokens(totals.totalTokens);
-        document.getElementById("summary-cost").textContent = formatCost(totals.cost);
+        const rows = [
+          ["total", "summary-tokens", "summary-cost"],
+          ["last30Days", "summary-30d-tokens", "summary-30d-cost"],
+          ["last24Hours", "summary-24h-tokens", "summary-24h-cost"],
+        ];
+        rows.forEach(([period, tokenId, costId]) => {
+          const totals = periodTotals(period, model);
+          document.getElementById(tokenId).textContent = `${formatTokens(totals.totalTokens)} tokens`;
+          document.getElementById(costId).textContent = formatCost(totals.cost);
+        });
         document.getElementById("heatmap-title").textContent = model === ALL_MODELS ? "Daily token heatmap" : `Daily token heatmap · ${model}`;
       }
 
@@ -389,6 +429,7 @@
         }
         const maximum = Math.max(...cells.map((cell) => cell.totals.totalTokens), 0);
         const seenMonths = new Set();
+        const monthColumns = new Map();
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
         for (let weekIndex = 0; weekIndex < 53; weekIndex++) {
@@ -398,12 +439,19 @@
             const monthId = `${date.getFullYear()}-${date.getMonth()}`;
             if (!seenMonths.has(monthId) && (date.getDate() === 1 || (weekIndex === 0 && dayIndex === 0))) {
               seenMonths.add(monthId);
-              const month = createElement("span", "month-label", monthNames[date.getMonth()]);
-              month.style.gridColumn = String(weekIndex + 1);
-              labels.appendChild(month);
+              // If two month boundaries share a week, prefer the newest label
+              // instead of allowing two labels to overlap.
+              monthColumns.set(weekIndex, monthNames[date.getMonth()]);
             }
           }
         }
+
+        monthColumns.forEach((monthName, weekIndex) => {
+          const month = createElement("span", "month-label", monthName);
+          month.style.gridColumn = String(weekIndex + 1);
+          month.style.gridRow = "1";
+          labels.appendChild(month);
+        });
 
         cells.forEach((cellData, index) => {
           const week = Math.floor(index / 7);

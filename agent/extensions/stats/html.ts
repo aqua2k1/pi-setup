@@ -19,11 +19,21 @@ export interface StatsHtmlDate {
   models: StatsHtmlModel[];
 }
 
+export interface StatsHtmlPeriod {
+  total: UsageTotals;
+  models: StatsHtmlModel[];
+}
+
 export interface StatsHtmlData {
   generatedAt: string;
   total: UsageTotals;
   models: StatsHtmlModel[];
   dates: StatsHtmlDate[];
+  periods: {
+    total: StatsHtmlPeriod;
+    last30Days: StatsHtmlPeriod;
+    last24Hours: StatsHtmlPeriod;
+  };
 }
 
 function modelData(model: string, totals: UsageTotals): StatsHtmlModel {
@@ -32,6 +42,49 @@ function modelData(model: string, totals: UsageTotals): StatsHtmlModel {
     totalTokens: totals.totalTokens,
     cost: totals.cost,
   };
+}
+
+function sortModelTotals(
+  modelTotals: Map<string, UsageTotals>,
+): StatsHtmlModel[] {
+  return [...modelTotals.entries()]
+    .sort(
+      ([leftModel, leftTotals], [rightModel, rightTotals]) =>
+        rightTotals.totalTokens - leftTotals.totalTokens ||
+        rightTotals.cost - leftTotals.cost ||
+        leftModel.localeCompare(rightModel),
+    )
+    .map(([model, totals]) => modelData(model, totals));
+}
+
+function periodData(
+  snapshot: StatsSnapshot,
+  start: number,
+  end: number,
+): StatsHtmlPeriod {
+  const models = new Map<string, UsageTotals>();
+  const total = { totalTokens: 0, cost: 0 };
+
+  for (const [timestamp, modelTotals] of snapshot.byTimestamp) {
+    if (timestamp < start || timestamp > end) continue;
+    for (const [model, value] of modelTotals) {
+      total.totalTokens += value.totalTokens;
+      total.cost += value.cost;
+      const modelTotal = models.get(model) ?? { totalTokens: 0, cost: 0 };
+      modelTotal.totalTokens += value.totalTokens;
+      modelTotal.cost += value.cost;
+      models.set(model, modelTotal);
+    }
+  }
+
+  return { total, models: sortModelTotals(models) };
+}
+
+function allTimePeriod(
+  snapshot: StatsSnapshot,
+  models: StatsHtmlModel[],
+): StatsHtmlPeriod {
+  return { total: { ...snapshot.total }, models };
 }
 
 export function serializeStatsSnapshot(
@@ -53,11 +106,19 @@ export function serializeStatsSnapshot(
         .map(([model, totals]) => modelData(model, totals)),
     }));
 
+  const end = generatedAt.getTime();
+  const day = 24 * 60 * 60 * 1000;
+
   return {
     generatedAt: generatedAt.toISOString(),
     total: { ...snapshot.total },
     models,
     dates,
+    periods: {
+      total: allTimePeriod(snapshot, models),
+      last30Days: periodData(snapshot, end - 30 * day, end),
+      last24Hours: periodData(snapshot, end - day, end),
+    },
   };
 }
 

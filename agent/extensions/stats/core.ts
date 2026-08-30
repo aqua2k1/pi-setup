@@ -14,6 +14,7 @@ export interface UsageTotals {
 
 export interface StatsSnapshot {
   byDate: Map<string, Map<string, UsageTotals>>;
+  byTimestamp: Map<number, Map<string, UsageTotals>>;
   byModel: Map<string, UsageTotals>;
   total: UsageTotals;
   filesScanned: number;
@@ -156,6 +157,7 @@ function contributionForEntry(
 export function createStatsSnapshot(): StatsSnapshot {
   return {
     byDate: new Map(),
+    byTimestamp: new Map(),
     byModel: new Map(),
     total: { totalTokens: 0, cost: 0 },
     filesScanned: 0,
@@ -166,12 +168,16 @@ export function createStatsSnapshot(): StatsSnapshot {
   };
 }
 
+function timestampValue(value: unknown): number | undefined {
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? undefined : timestamp;
+}
+
 export function dateKey(value: unknown): string | undefined {
-  const date =
-    typeof value === "number" || typeof value === "string"
-      ? new Date(value)
-      : undefined;
-  if (!date || Number.isNaN(date.getTime())) return undefined;
+  const timestamp = timestampValue(value);
+  if (timestamp === undefined) return undefined;
+  const date = new Date(timestamp);
   return [
     date.getFullYear(),
     String(date.getMonth() + 1).padStart(2, "0"),
@@ -207,17 +213,30 @@ export function addSessionEntry(
   snapshot.byModel.set(contribution.model, modelTotals);
   addTotals(snapshot.total, total);
 
-  const day = dateKey(contribution.timestamp);
-  if (day) {
-    const modelByDay =
-      snapshot.byDate.get(day) ?? new Map<string, UsageTotals>();
-    const dayTotals = modelByDay.get(contribution.model) ?? {
+  const timestamp = timestampValue(contribution.timestamp);
+  if (timestamp !== undefined) {
+    const modelByTimestamp =
+      snapshot.byTimestamp.get(timestamp) ?? new Map<string, UsageTotals>();
+    const timestampTotals = modelByTimestamp.get(contribution.model) ?? {
       totalTokens: 0,
       cost: 0,
     };
-    addTotals(dayTotals, total);
-    modelByDay.set(contribution.model, dayTotals);
-    snapshot.byDate.set(day, modelByDay);
+    addTotals(timestampTotals, total);
+    modelByTimestamp.set(contribution.model, timestampTotals);
+    snapshot.byTimestamp.set(timestamp, modelByTimestamp);
+
+    const day = dateKey(timestamp);
+    if (day) {
+      const modelByDay =
+        snapshot.byDate.get(day) ?? new Map<string, UsageTotals>();
+      const dayTotals = modelByDay.get(contribution.model) ?? {
+        totalTokens: 0,
+        cost: 0,
+      };
+      addTotals(dayTotals, total);
+      modelByDay.set(contribution.model, dayTotals);
+      snapshot.byDate.set(day, modelByDay);
+    }
   }
 
   snapshot.usageEntries++;
@@ -353,5 +372,24 @@ export function totalsForDate(
 
   const total = { totalTokens: 0, cost: 0 };
   for (const value of modelByDay.values()) addTotals(total, value);
+  return total;
+}
+
+export function totalsForTimeRange(
+  snapshot: StatsSnapshot,
+  start: number,
+  end: number,
+  model: string = ALL_MODELS,
+): UsageTotals {
+  const total = { totalTokens: 0, cost: 0 };
+  for (const [timestamp, modelTotals] of snapshot.byTimestamp) {
+    if (timestamp < start || timestamp > end) continue;
+    if (model !== ALL_MODELS) {
+      const value = modelTotals.get(model);
+      if (value) addTotals(total, value);
+      continue;
+    }
+    for (const value of modelTotals.values()) addTotals(total, value);
+  }
   return total;
 }

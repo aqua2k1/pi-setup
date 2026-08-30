@@ -22,6 +22,7 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
+import { notify } from "../notify/index.ts";
 import {
   buildTask,
   firstLineOf,
@@ -122,6 +123,7 @@ export default function (pi: ExtensionAPI) {
           return;
         }
         ctx.ui.setStatus("commit", undefined);
+        notify("pi", "commit message done!");
 
         const action = await chooseAction(ctx, message);
         if (action === undefined || action === "取消") {
