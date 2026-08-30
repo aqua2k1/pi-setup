@@ -19,12 +19,12 @@
  * Usage: /preview
  */
 
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { runTerminalApp } from "./terminal.ts";
 
 // nvim invocation. Hardcoded "nvim"; resolved via PATH.
 // -R  read-only (prevents accidental :w to the original path)
@@ -178,39 +178,18 @@ export default function (pi: ExtensionAPI) {
       writeFileSync(file, `${body}\n`, "utf8");
 
       try {
-        await ctx.ui.custom<null>((tui, _theme, _kb, done) => {
-          // Release the terminal for nvim.
-          tui.stop();
-          process.stdout.write("\x1b[2J\x1b[H");
-
-          try {
-            const result = spawnSync(NVIM_COMMAND, [...NVIM_ARGS, file], {
-              stdio: "inherit",
-              env: process.env,
-            });
-            // ENOENT (nvim not on PATH) appears as result.error.
-            const notFound =
-              !!result.error &&
-              (result.error as NodeJS.ErrnoException).code === "ENOENT";
-            if (notFound) done(new nvimNotFound());
-            else done(null);
-          } catch (err) {
-            done(err instanceof Error ? err : new nvimNotFound());
-          }
-
-          // Resume the pi TUI in *all* exit paths before done() unwinds.
-          tui.start();
-          tui.requestRender(true);
-
-          return { render: () => [], invalidate: () => {} };
+        const result = await runTerminalApp(ctx, NVIM_COMMAND, {
+          args: [...NVIM_ARGS, file],
+          clearScreen: true,
         });
-      } catch (err) {
-        if (err instanceof nvimNotFound) {
+        if (result.kind === "not-found") {
           ctx.ui.notify("未找到 nvim，请确认已安装并在 PATH 中", "error");
-        } else {
-          ctx.ui.notify("/preview 打开 nvim 失败", "error");
+          return;
         }
-        return;
+        if (result.kind === "launch-error") {
+          ctx.ui.notify("/preview 打开 nvim 失败", "error");
+          return;
+        }
       } finally {
         // Best-effort cleanup of the temp file/dir.
         try {
@@ -221,12 +200,4 @@ export default function (pi: ExtensionAPI) {
       }
     },
   });
-
-  // Sentinel used to distinguish ENOENT from other errors thrown via done().
-  class nvimNotFound extends Error {
-    constructor() {
-      super("nvim not found");
-      this.name = "NvimNotFound";
-    }
-  }
 }

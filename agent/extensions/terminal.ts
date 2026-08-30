@@ -13,62 +13,136 @@
 import { spawnSync } from "node:child_process";
 import type {
   ExtensionAPI,
-  ExtensionCommandContext,
+  ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 
-/** Result of running a suspended terminal app. */
-interface RunResult {
-  status: number | null;
-  notFound: boolean;
+export interface RunTerminalAppOptions {
+  /** Arguments passed directly to the executable. */
+  args?: readonly string[];
+  /** Clear the terminal after suspending pi and before starting the app. */
+  clearScreen?: boolean;
+}
+
+/** Structured outcome; callers own user-facing notification policy. */
+export type TerminalAppResult =
+  | { kind: "unavailable" }
+  | { kind: "not-found"; error: Error }
+  | { kind: "launch-error"; error: Error }
+  | {
+      kind: "exited";
+      status: number | null;
+      signal: NodeJS.Signals | null;
+    };
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function isNotFound(error: Error): boolean {
+  return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
 
 /**
- * Suspend the TUI, run a terminal app with inherited stdio, then restore
- * the TUI. Requires interactive TUI mode (stdio: inherit needs a real TTY).
+ * Suspend pi's TUI, run an interactive terminal app with inherited stdio,
+ * and always restore the TUI afterward. This is the shared launch primitive
+ * for extensions that need to hand full terminal control to another process.
  */
-async function runSuspended(
-  ctx: ExtensionCommandContext,
-  cmd: string,
-  args: string[] = [],
-): Promise<void> {
-  if (ctx.mode !== "tui") {
-    ctx.ui.notify(`${cmd} requires an interactive terminal`, "warning");
-    return;
-  }
+export async function runTerminalApp(
+  ctx: ExtensionContext,
+  command: string,
+  options: RunTerminalAppOptions = {},
+): Promise<TerminalAppResult> {
+  if (ctx.mode !== "tui") return { kind: "unavailable" };
 
-  const result = await ctx.ui.custom<RunResult>((tui, _theme, _kb, done) => {
-    // Stop pi's TUI to release the terminal
-    tui.stop();
+  try {
+    return await ctx.ui.custom<TerminalAppResult>(
+      (tui, _theme, _keybindings, done) => {
+        let result: TerminalAppResult;
+        try {
+          tui.stop();
+          if (options.clearScreen) process.stdout.write("\x1b[2J\x1b[H");
 
-    // Run the app with full terminal access
-    const r = spawnSync(cmd, args, {
-      stdio: "inherit",
-      cwd: ctx.cwd,
-      env: process.env,
-    });
+          const child = spawnSync(command, [...(options.args ?? [])], {
+            stdio: "inherit",
+            cwd: ctx.cwd,
+            env: process.env,
+          });
 
-    // Restart pi's TUI
-    tui.start();
-    tui.requestRender(true);
+          if (child.error) {
+            const error = asError(child.error);
+            result = {
+              kind: isNotFound(error) ? "not-found" : "launch-error",
+              error,
+            };
+          } else {
+            result = {
+              kind: "exited",
+              status: child.status,
+              signal: child.signal,
+            };
+          }
+        } catch (error) {
+          const launchError = asError(error);
+          result = {
+            kind: isNotFound(launchError) ? "not-found" : "launch-error",
+            error: launchError,
+          };
+        } finally {
+          try {
+            tui.start();
+            tui.requestRender(true);
+          } catch (error) {
+            result = { kind: "launch-error", error: asError(error) };
+          }
+        }
 
-    done({
-      status: r.status,
-      notFound:
-        !!r.error && (r.error as NodeJS.ErrnoException).code === "ENOENT",
-    });
-
-    return { render: () => [], invalidate: () => {} };
-  });
-
-  if (result.notFound) {
-    ctx.ui.notify(
-      `${cmd} not found - please install it and ensure it's on PATH`,
-      "error",
+        done(result);
+        return { render: () => [], invalidate: () => {} };
+      },
     );
-  } else if (result.status === 0) {
-    ctx.ui.notify(`${cmd} exited successfully`, "info");
-  } else {
-    ctx.ui.notify(`${cmd} exited with code ${result.status}`, "warning");
+  } catch (error) {
+    return { kind: "launch-error", error: asError(error) };
+  }
+}
+
+async function runSuspended(
+  ctx: ExtensionContext,
+  command: string,
+  args: readonly string[] = [],
+): Promise<void> {
+  const result = await runTerminalApp(ctx, command, { args });
+
+  switch (result.kind) {
+    case "unavailable":
+      ctx.ui.notify(`${command} requires an interactive terminal`, "warning");
+      break;
+    case "not-found":
+      ctx.ui.notify(
+        `${command} not found - please install it and ensure it's on PATH`,
+        "error",
+      );
+      break;
+    case "launch-error":
+      ctx.ui.notify(
+        `Failed to launch ${command}: ${result.error.message}`,
+        "error",
+      );
+      break;
+    case "exited":
+      if (result.status === 0) {
+        ctx.ui.notify(`${command} exited successfully`, "info");
+      } else if (result.signal) {
+        ctx.ui.notify(
+          `${command} exited due to signal ${result.signal}`,
+          "warning",
+        );
+      } else {
+        ctx.ui.notify(
+          `${command} exited with code ${result.status ?? "unknown"}`,
+          "warning",
+        );
+      }
+      break;
   }
 }
 
