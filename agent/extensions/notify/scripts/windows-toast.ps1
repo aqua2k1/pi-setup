@@ -6,11 +6,14 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-$appId = Get-StartApps |
-    Where-Object { $_.AppID -like "*\WindowsPowerShell\v1.0\powershell.exe" } |
+$appId = Get-StartApps | 
+    Where-Object { 
+        $_.AppID -like "*WindowsTerminal*" -or 
+        $_.AppID -like "*Terminal*" 
+    } |
     Select-Object -First 1 -ExpandProperty AppID
 if ([string]::IsNullOrWhiteSpace($appId)) {
-    throw "Registered Windows PowerShell AppUserModelID not found"
+    throw "Registered Windows Terminal AppUserModelID not found"
 }
 
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
