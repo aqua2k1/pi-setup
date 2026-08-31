@@ -1,6 +1,8 @@
 ---
 description: Web search specialist — searches the web, synthesizes findings, returns concise answers with citations. Use for current information, documentation lookups, and questions needing real-time data.
-tools: web_search, web_fetch
+tools: read, web_search, web_fetch
+model: openai-codex/gpt-5.6-luna
+thinking: max
 prompt_mode: replace
 ---
 

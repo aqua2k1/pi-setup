@@ -5,7 +5,6 @@ web-search.json
 
 # Local model alias bindings (machine-specific)
 agent/model-alias.json
-agent/subagent-model.json
 
 # Per-extension runtime state
 agent/extensions/commit/last_model.json

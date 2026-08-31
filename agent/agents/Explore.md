@@ -1,6 +1,8 @@
 ---
 description: Fast codebase exploration (read-only)
 tools: read, bash, find, grep
+model: openai-codex/gpt-5.6-luna
+thinking: max
 prompt_mode: replace
 ---
 
