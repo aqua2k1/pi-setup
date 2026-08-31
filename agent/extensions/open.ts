@@ -7,7 +7,7 @@
  * open  — LLM-callable tool
  */
 
-import { execSync, spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
@@ -40,7 +40,9 @@ function isUrl(input: string): boolean {
 }
 
 function toWindowsPath(linuxPath: string): string {
-  return execSync(`wslpath -w "${linuxPath}"`, { encoding: "utf-8" }).trim();
+  return execFileSync("wslpath", ["-w", linuxPath], {
+    encoding: "utf-8",
+  }).trim();
 }
 
 /** Resolve input to an absolute path (URLs pass through unchanged). */
@@ -141,8 +143,8 @@ export default function (pi: ExtensionAPI) {
         description: "The file path, URL, or directory to open",
       }),
     }),
-    async execute(_toolCallId, params) {
-      const result = openTarget(params.target, process.cwd());
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      const result = openTarget(params.target, ctx.cwd);
       return {
         content: [{ type: "text", text: result.message }],
         details: {},
