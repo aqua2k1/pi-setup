@@ -1,0 +1,12 @@
+export const DEFAULT_SEARCH_TIMEOUT_MS = 15_000;
+export const MIN_SEARCH_TIMEOUT_MS = 1_000;
+export const MAX_SEARCH_TIMEOUT_MS = 120_000;
+export const DEFAULT_MAX_RESULTS = 5;
+export const MIN_MAX_RESULTS = 1;
+export const MAX_MAX_RESULTS = 10;
+export const MAX_QUERY_LENGTH = 2_000;
+export const MAX_DOMAIN_COUNT = 20;
+export const MAX_DOMAIN_LENGTH = 253;
+export const MAX_RECENCY_DAYS = 3_650;
+export const MAX_RESPONSE_BYTES = 1_048_576;
+export const MAX_OUTPUT_BYTES = 50 * 1_024;
