@@ -9,7 +9,7 @@ import {
   type ResolvedWebSearchConfig,
   readConfig,
   resolveConfig,
-  type WebSearchFileConfig,
+  type WebToolsFileConfig,
 } from "./config.ts";
 import { errorMessageForCode, toWebSearchError } from "./core/errors.ts";
 import type { WebSearchProviderName } from "./core/types.ts";
@@ -25,10 +25,9 @@ const COMMAND_ARGUMENTS = [
   "test codex",
 ];
 const DEFAULT_SEARCH_QUERY = "pi web search connectivity";
-
 type ConfigSource = "env" | "config" | "default" | "none";
 
-export interface WebSearchCommandDependencies {
+export interface WebToolsCommandDependencies {
   readConfig?: typeof readConfig;
   search?: typeof searchWeb;
   env?: NodeJS.ProcessEnv;
@@ -50,18 +49,19 @@ function source(
 }
 
 function statusText(
-  raw: WebSearchFileConfig,
+  raw: WebToolsFileConfig,
   ctx: ExtensionCommandContext,
   env: NodeJS.ProcessEnv,
 ): string {
   const config = resolveConfig(raw, env);
-  const fallbackSource =
-    raw.routing?.fallback === undefined ? "default" : "config";
+  const search = raw.search ?? {};
+  const routing = search.routing ?? {};
+  const fallbackSource = routing.fallback === undefined ? "default" : "config";
   const fallbackProvider =
-    config.fallbackProvider ??
-    (config.provider === "searxng" ? "codex-alpha-search" : "searxng");
+    config.search.fallbackProvider ??
+    (config.search.provider === "searxng" ? "codex-alpha-search" : "searxng");
   const fallbackProviderSource =
-    raw.routing?.fallbackProvider === undefined ? "default" : "config";
+    routing.fallbackProvider === undefined ? "default" : "config";
   const keySource = source(env.SEARXNG_API_KEY, undefined, false);
   let auth = "unavailable";
   try {
@@ -72,28 +72,38 @@ function statusText(
     // Keep status useful when the host registry is unavailable.
   }
   return [
-    "Web search configuration:",
-    `  provider: ${PROVIDER_LABELS[config.provider]} (${source(undefined, raw.routing?.provider, true)})`,
-    `  fallback: ${config.fallback ? "enabled" : "disabled"} (${fallbackSource})`,
-    `  fallback provider: ${PROVIDER_LABELS[fallbackProvider]} (${fallbackProviderSource})`,
-    `  timeout: ${config.timeoutMs} ms (config/default)`,
-    `  default max results: ${config.maxResults} (config/default)`,
+    "Web tools configuration:",
+    `  config file: ${getConfigPath()}`,
+    `  search provider: ${PROVIDER_LABELS[config.search.provider]} (${source(undefined, routing.provider, true)})`,
+    `  search fallback: ${config.search.fallback ? "enabled" : "disabled"} (${fallbackSource})`,
+    `  search fallback provider: ${PROVIDER_LABELS[fallbackProvider]} (${fallbackProviderSource})`,
+    `  search timeout: ${config.search.timeoutMs} ms`,
+    `  search default max results: ${config.search.maxResults}`,
     `  SearXNG URL: configured (${source(env.SEARXNG_URL, undefined, true)})`,
     `  SearXNG Bearer key: ${keySource === "none" ? "not set" : `set (${keySource})`}`,
-    `  Codex model: configured (${source(undefined, raw.codex?.model, true)})`,
+    `  Codex model: configured (${source(undefined, search.codex?.model, true)})`,
     `  Codex authentication: ${auth}`,
+    `  fetch timeout: ${config.fetch.timeoutMs} ms`,
+    `  GitHub fetch: ${config.fetch.github.enabled ? "enabled" : "disabled"}`,
+    `  GitHub mode: ${config.fetch.github.mode}`,
+    `  GitHub clone threshold: ${config.fetch.github.maxRepoSizeMB} MiB`,
+    `  GitHub clone timeout: ${config.fetch.github.cloneTimeoutSeconds} s`,
     "",
-    "SearXNG URL and credentials are read from environment variables; routing and other settings are read from web-search-config.json.",
-    "Fallback is disabled by default; enabling it may send a query to ChatGPT.",
+    "Search settings are under search; fetch settings are under fetch.",
+    "SearXNG URL and credentials are read from environment variables.",
+    "GitHub uses gh api or shallow clone when the local commands are available.",
   ].join("\n");
 }
 
 async function testProvider(
   ctx: ExtensionCommandContext,
   provider: WebSearchProviderName,
-  deps: Required<WebSearchCommandDependencies>,
+  deps: Required<WebToolsCommandDependencies>,
 ): Promise<void> {
-  const base = resolveConfig(await deps.readConfig(getConfigPath()), deps.env);
+  const base = resolveConfig(
+    await deps.readConfig(getConfigPath()),
+    deps.env,
+  ).search;
   const config: ResolvedWebSearchConfig = {
     ...base,
     provider,
@@ -112,17 +122,17 @@ async function testProvider(
   );
 }
 
-export function registerWebSearchCommand(
+export function registerWebToolsCommand(
   pi: ExtensionAPI,
-  provided: WebSearchCommandDependencies = {},
+  provided: WebToolsCommandDependencies = {},
 ): void {
-  const deps: Required<WebSearchCommandDependencies> = {
+  const deps: Required<WebToolsCommandDependencies> = {
     readConfig: provided.readConfig ?? readConfig,
     search: provided.search ?? searchWeb,
     env: provided.env ?? process.env,
   };
-  pi.registerCommand("web-search", {
-    description: "Inspect or test the web_search provider.",
+  pi.registerCommand("web-tools", {
+    description: "Inspect or test web-tools search configuration.",
     getArgumentCompletions: (prefix) => {
       const values = COMMAND_ARGUMENTS.filter((value) =>
         value.startsWith(prefix.trimStart()),
@@ -151,7 +161,7 @@ export function registerWebSearchCommand(
           await testProvider(ctx, provider, deps);
         } else {
           ctx.ui.notify(
-            "/web-search status\n/web-search test <searxng|codex-alpha-search|codex>",
+            "/web-tools status\n/web-tools test <searxng|codex-alpha-search|codex>",
             "info",
           );
         }

@@ -7,13 +7,15 @@ const request = { query: "test", maxResults: 1 };
 
 test("SearXNG composition neither requires a registry nor validates unused Codex settings", async () => {
   const config = resolveConfig(
-    { codex: { model: "x".repeat(1_000) } },
+    {
+      search: { codex: { model: "x".repeat(1_000) } },
+    },
     {
       SEARXNG_URL: "http://your-searxng-host",
       SEARXNG_API_KEY: "fixture-searx-key",
     },
   );
-  const result = await searchWeb(request, config, {
+  const result = await searchWeb(request, config.search, {
     fetch: async () => Response.json({ results: [] }),
   });
   assert.equal(result.provider, "searxng");
@@ -21,8 +23,11 @@ test("SearXNG composition neither requires a registry nor validates unused Codex
 
 test("Codex composition uses provider-level OAuth only", async () => {
   const token = `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify({ chatgpt_account_id: "fixture-account" })).toString("base64url")}.signature`;
-  const config = resolveConfig({ routing: { provider: "codex" } }, {});
-  const result = await searchWeb(request, config, {
+  const config = resolveConfig(
+    { search: { routing: { provider: "codex" } } },
+    {},
+  );
+  const result = await searchWeb(request, config.search, {
     modelRegistry: {
       getProviderAuth: async () => ({
         source: "OAuth",
@@ -50,9 +55,11 @@ test("fallback composition isolates provider credentials and preserves redacted 
   const seen: string[] = [];
   const config = resolveConfig(
     {
-      routing: {
-        fallback: true,
-        fallbackProvider: "codex-alpha-search",
+      search: {
+        routing: {
+          fallback: true,
+          fallbackProvider: "codex-alpha-search",
+        },
       },
     },
     {
@@ -60,7 +67,7 @@ test("fallback composition isolates provider credentials and preserves redacted 
       SEARXNG_API_KEY: "fixture-searx-key",
     },
   );
-  const result = await searchWeb({ ...request, query: token }, config, {
+  const result = await searchWeb({ ...request, query: token }, config.search, {
     modelRegistry: {
       getProviderAuth: async () => ({
         source: "OAuth",

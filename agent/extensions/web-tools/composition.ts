@@ -1,6 +1,11 @@
-import type { ResolvedWebSearchConfig } from "./config.ts";
+import type {
+  ResolvedWebFetchConfig,
+  ResolvedWebSearchConfig,
+} from "./config.ts";
 import { WebSearchRouter } from "./core/router.ts";
 import type { RoutedSearchResponse, SearchRequest } from "./core/types.ts";
+import { fetchWeb as routeFetchWeb } from "./fetch/router.ts";
+import type { FetchResponse, FetchRuntime } from "./fetch/types.ts";
 import {
   type CodexModelRegistry,
   resolveCodexAuth,
@@ -14,7 +19,7 @@ export interface SearchRuntime {
   fetch?: FetchLike;
 }
 
-/** The only place that assembles concrete providers; unused providers stay untouched. */
+/** The only place that assembles concrete search providers. */
 export function searchWeb(
   request: SearchRequest,
   config: ResolvedWebSearchConfig,
@@ -46,4 +51,18 @@ export function searchWeb(
     },
     signal,
   );
+}
+
+export interface FetchWebRequest {
+  url: string;
+  raw?: boolean;
+}
+
+export function fetchWeb(
+  request: FetchWebRequest,
+  config: ResolvedWebFetchConfig,
+  runtime: FetchRuntime = {},
+  signal?: AbortSignal,
+): Promise<FetchResponse> {
+  return routeFetchWeb(request, config, runtime, signal);
 }

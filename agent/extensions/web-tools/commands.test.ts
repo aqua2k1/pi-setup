@@ -5,10 +5,10 @@ import type {
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import {
-  registerWebSearchCommand,
-  type WebSearchCommandDependencies,
+  registerWebToolsCommand,
+  type WebToolsCommandDependencies,
 } from "./commands.ts";
-import type { WebSearchFileConfig } from "./config.ts";
+import type { WebToolsFileConfig } from "./config.ts";
 
 interface CapturedCommand {
   getArgumentCompletions?: (
@@ -18,7 +18,7 @@ interface CapturedCommand {
 }
 
 function capture(
-  dependencies: WebSearchCommandDependencies = {},
+  dependencies: WebToolsCommandDependencies = {},
 ): CapturedCommand {
   let command: CapturedCommand | undefined;
   const pi = {
@@ -26,7 +26,7 @@ function capture(
       command = options;
     },
   } as unknown as ExtensionAPI;
-  registerWebSearchCommand(pi, { env: {}, ...dependencies });
+  registerWebToolsCommand(pi, { env: {}, ...dependencies });
   assert.ok(command);
   return command;
 }
@@ -53,20 +53,26 @@ function context(): {
   return { ctx, notifications };
 }
 
-function currentConfig(): WebSearchFileConfig {
+function currentConfig(): WebToolsFileConfig {
   return {
-    routing: {
-      provider: "codex-alpha-search",
-      fallback: true,
-      fallbackProvider: "searxng",
+    search: {
+      routing: {
+        provider: "codex-alpha-search",
+        fallback: true,
+        fallbackProvider: "searxng",
+      },
+      timeoutMs: 5_000,
+      maxResults: 2,
+      codex: { model: "synthetic-codex-model" },
     },
-    timeoutMs: 5_000,
-    maxResults: 2,
-    codex: { model: "synthetic-codex-model" },
+    fetch: {
+      timeoutMs: 5_000,
+      github: { enabled: true, mode: "auto" },
+    },
   };
 }
 
-test("registerWebSearchCommand: exposes status and full test arguments only", () => {
+test("registerWebToolsCommand: exposes status and provider test arguments", () => {
   const command = capture();
   assert.deepEqual(
     command.getArgumentCompletions?.("")?.map((completion) => completion.value),
@@ -81,7 +87,7 @@ test("registerWebSearchCommand: exposes status and full test arguments only", ()
   assert.deepEqual(command.getArgumentCompletions?.("configure"), null);
 });
 
-test("/web-search status: reads non-secret settings from JSON and URL/key from env", async () => {
+test("/web-tools status: reports separate search and fetch settings", async () => {
   const command = capture({
     readConfig: async () => currentConfig(),
     env: {
@@ -95,11 +101,12 @@ test("/web-search status: reads non-secret settings from JSON and URL/key from e
 
   assert.equal(notifications.length, 1);
   const status = notifications[0] ?? "";
-  assert.match(status, /provider: Codex alpha\/search \(config\)/);
-  assert.match(status, /fallback: enabled \(config\)/);
-  assert.match(status, /fallback provider: SearXNG \(config\)/);
-  assert.match(status, /timeout: 5000 ms/);
-  assert.match(status, /default max results: 2/);
+  assert.match(status, /search provider: Codex alpha\/search \(config\)/);
+  assert.match(status, /search fallback: enabled \(config\)/);
+  assert.match(status, /search fallback provider: SearXNG \(config\)/);
+  assert.match(status, /fetch timeout: 5000 ms/);
+  assert.match(status, /GitHub fetch: enabled/);
+  assert.match(status, /GitHub mode: auto/);
   assert.match(status, /Codex authentication: configured \(OAuth required\)/);
   assert.match(status, /SearXNG URL: configured \(env\)/);
   assert.match(status, /SearXNG Bearer key: set \(env\)/);
@@ -109,18 +116,18 @@ test("/web-search status: reads non-secret settings from JSON and URL/key from e
   );
 });
 
-test("/web-search configure: is intentionally unavailable", async () => {
+test("/web-tools configure: is intentionally unavailable", async () => {
   const command = capture();
   const { ctx, notifications } = context();
 
   await command.handler("configure", ctx);
 
   assert.deepEqual(notifications, [
-    "/web-search status\n/web-search test <searxng|codex-alpha-search|codex>",
+    "/web-tools status\n/web-tools test <searxng|codex-alpha-search|codex>",
   ]);
 });
 
-test("/web-search test codex: accepts the alias and injects the runtime", async () => {
+test("/web-tools test codex: accepts the alias and injects the runtime", async () => {
   let observedProvider = "";
   let observedFallback = true;
   let observedRegistry: unknown;
@@ -155,7 +162,7 @@ test("/web-search test codex: accepts the alias and injects the runtime", async 
   ]);
 });
 
-test("/web-search command errors remain classified and safe", async () => {
+test("/web-tools command errors remain classified and safe", async () => {
   const command = capture({
     readConfig: async () => {
       throw new Error("synthetic-raw-config-error");
