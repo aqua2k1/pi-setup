@@ -35,6 +35,14 @@ interface ApiTreeEntry {
   size?: unknown;
 }
 
+interface CloneOperation {
+  readonly promise: Promise<string | null>;
+  readonly controller: AbortController;
+  waiters: number;
+  settled: boolean;
+  accepting: boolean;
+}
+
 function cacheKey(info: GitHubUrlInfo, ref?: string): string {
   return `${info.owner}/${info.repo}@${ref ?? "default"}`;
 }
@@ -95,6 +103,28 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1_024 * 1_024)).toFixed(1)} MiB`;
 }
 
+type GitHubFetchPlan =
+  | { kind: "api"; ref: string | undefined }
+  | { kind: "clone"; ref: string | undefined };
+
+function decideFetchPlan(
+  config: ResolvedGitHubFetchConfig,
+  info: GitHubUrlInfo,
+  metadata: { defaultBranch?: string; sizeMB?: number } | null,
+): GitHubFetchPlan {
+  const ref = info.ref ?? metadata?.defaultBranch;
+  if (
+    info.refIsFullSha ||
+    config.mode === "api" ||
+    (config.mode === "auto" &&
+      metadata?.sizeMB !== undefined &&
+      metadata.sizeMB > config.maxRepoSizeMB)
+  ) {
+    return { kind: "api", ref };
+  }
+  return { kind: "clone", ref };
+}
+
 export interface GitHubHandlerOptions {
   config: ResolvedGitHubFetchConfig;
   runtime?: FetchRuntime;
@@ -105,8 +135,9 @@ export class GitHubHandler implements FetchHandler {
   private readonly gh: GhClient;
   private readonly now: () => number;
   private readonly uuid: () => string;
-  private readonly clones = new Map<string, Promise<string | null>>();
+  private readonly clones = new Map<string, CloneOperation>();
   private cloneCount = 0;
+  private cloneReservations = 0;
 
   constructor(options: GitHubHandlerOptions) {
     this.config = { ...options.config };
@@ -132,29 +163,21 @@ export class GitHubHandler implements FetchHandler {
     assertNotCancelled(signal);
 
     await cleanupExpiredClones(this.config.clonePath, this.now());
-    const metadata = await this.gh.repoMetadata(info.owner, info.repo, signal);
-    const ref = info.ref ?? metadata?.defaultBranch;
-    if (info.refIsFullSha || this.config.mode === "api") {
-      return (await this.fetchViaApi(stableRequest, info, ref, signal)) ?? null;
-    }
-
-    if (
-      this.config.mode === "auto" &&
-      metadata?.sizeMB !== undefined &&
-      metadata.sizeMB > this.config.maxRepoSizeMB
-    ) {
-      const apiResult = await this.fetchViaApi(
-        stableRequest,
-        info,
-        ref,
-        signal,
-      );
-      if (apiResult) return apiResult;
+    const needsMetadata =
+      this.config.mode === "auto"
+        ? !info.refIsFullSha
+        : this.config.mode === "api" && !info.ref;
+    const metadata = needsMetadata
+      ? await this.gh.repoMetadata(info.owner, info.repo, signal)
+      : null;
+    const plan = decideFetchPlan(this.config, info, metadata);
+    if (plan.kind === "api") {
+      return this.fetchViaApi(stableRequest, info, plan.ref, signal);
     }
 
     let cloned: string | null;
     try {
-      cloned = await this.getOrClone(info, ref, signal);
+      cloned = await this.getOrClone(info, plan.ref, signal);
     } catch (error) {
       if (
         error instanceof WebFetchError &&
@@ -163,7 +186,7 @@ export class GitHubHandler implements FetchHandler {
         const apiResult = await this.fetchViaApi(
           stableRequest,
           info,
-          ref,
+          plan.ref,
           signal,
         );
         if (apiResult) return apiResult;
@@ -185,7 +208,7 @@ export class GitHubHandler implements FetchHandler {
       );
     }
 
-    return this.fetchViaApi(stableRequest, info, ref, signal);
+    return this.fetchViaApi(stableRequest, info, plan.ref, signal);
   }
 
   private async getOrClone(
@@ -197,40 +220,108 @@ export class GitHubHandler implements FetchHandler {
     const key = cacheKey(info, ref);
     const cached = this.clones.get(key);
     if (cached) {
-      let existing: string | null;
-      try {
-        existing = await cached;
-      } catch (error) {
-        this.clones.delete(key);
-        throw error;
+      if (!cached.accepting) {
+        await cached.promise.catch(() => null);
+        if (this.clones.get(key) === cached) this.clones.delete(key);
+        return this.getOrClone(info, ref, signal);
       }
+      const existing = await this.waitForClone(cached, signal);
       if (existing) {
         try {
           await stat(existing);
           return existing;
         } catch {
-          this.clones.delete(key);
+          if (this.clones.get(key) === cached) this.clones.delete(key);
         }
       } else {
-        this.clones.delete(key);
+        if (this.clones.get(key) === cached) this.clones.delete(key);
         return null;
       }
     }
-    if (this.cloneCount >= MAX_GITHUB_SESSION_CLONES) return null;
+    if (this.cloneCount + this.cloneReservations >= MAX_GITHUB_SESSION_CLONES)
+      return null;
+    this.cloneReservations++;
 
     const path = cloneDirectory(this.config.clonePath, key);
-    const promise = this.clone(info, ref, path, signal);
-    this.clones.set(key, promise);
-    const result = await promise;
-    if (!result) this.clones.delete(key);
-    return result;
+    const controller = new AbortController();
+    let operation: CloneOperation;
+    const promise = this.clone(info, ref, path, controller.signal).then(
+      (result) => {
+        operation.settled = true;
+        this.cloneReservations--;
+        if (result) this.cloneCount++;
+        return result;
+      },
+      (error: unknown) => {
+        operation.settled = true;
+        this.cloneReservations--;
+        throw error;
+      },
+    );
+    operation = {
+      promise,
+      controller,
+      waiters: 0,
+      settled: false,
+      accepting: true,
+    };
+    this.clones.set(key, operation);
+    void operation.promise.then(
+      (result) => {
+        if (!result && this.clones.get(key) === operation) {
+          this.clones.delete(key);
+        }
+      },
+      () => {
+        if (this.clones.get(key) === operation) this.clones.delete(key);
+      },
+    );
+    return this.waitForClone(operation, signal);
+  }
+
+  private async waitForClone(
+    operation: CloneOperation,
+    signal?: AbortSignal,
+  ): Promise<string | null> {
+    assertNotCancelled(signal);
+    operation.waiters++;
+    return new Promise<string | null>((resolve, reject) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return false;
+        finished = true;
+        signal?.removeEventListener("abort", onAbort);
+        operation.waiters--;
+        if (operation.waiters === 0 && !operation.settled) {
+          operation.accepting = false;
+          operation.controller.abort();
+        }
+        return true;
+      };
+      const onAbort = () => {
+        if (!finish()) return;
+        reject(new WebFetchError("cancelled", "Web fetch was cancelled."));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      operation.promise.then(
+        (result) => {
+          if (!finish()) return;
+          resolve(result);
+        },
+        (error: unknown) => {
+          if (!finish()) return;
+          reject(error);
+        },
+      );
+      if (signal?.aborted) onAbort();
+    });
   }
 
   private async clone(
     info: GitHubUrlInfo,
     ref: string | undefined,
     finalPath: string,
-    signal?: AbortSignal,
+    signal: AbortSignal,
   ): Promise<string | null> {
     const parent = this.config.clonePath;
     await mkdir(parent, { recursive: true, mode: 0o700 });
@@ -253,7 +344,6 @@ export class GitHubHandler implements FetchHandler {
       }
       await chmod(temporaryPath, 0o700).catch(() => {});
       await rename(temporaryPath, finalPath);
-      this.cloneCount++;
       return finalPath;
     } catch (error) {
       await rm(temporaryPath, { recursive: true, force: true }).catch(() => {});

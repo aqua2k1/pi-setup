@@ -7,6 +7,7 @@ import {
   getConfigPath,
   normalizeProviderName,
   type ResolvedWebSearchConfig,
+  type ResolvedWebToolsConfig,
   readConfig,
   resolveConfig,
   type WebToolsFileConfig,
@@ -27,7 +28,15 @@ const COMMAND_ARGUMENTS = [
 const DEFAULT_SEARCH_QUERY = "pi web search connectivity";
 type ConfigSource = "env" | "config" | "default" | "none";
 
+export interface WebToolsConfigSnapshot {
+  readonly rawConfig: WebToolsFileConfig;
+  readonly resolvedConfig: ResolvedWebToolsConfig;
+}
+
 export interface WebToolsCommandDependencies {
+  /** The single configuration snapshot loaded during extension startup. */
+  config?: WebToolsConfigSnapshot;
+  /** Legacy fallback for callers that do not provide a startup snapshot. */
   readConfig?: typeof readConfig;
   search?: typeof searchWeb;
   env?: NodeJS.ProcessEnv;
@@ -50,10 +59,10 @@ function source(
 
 function statusText(
   raw: WebToolsFileConfig,
+  config: ResolvedWebToolsConfig,
   ctx: ExtensionCommandContext,
   env: NodeJS.ProcessEnv,
 ): string {
-  const config = resolveConfig(raw, env);
   const search = raw.search ?? {};
   const routing = search.routing ?? {};
   const fallbackSource = routing.fallback === undefined ? "default" : "config";
@@ -98,20 +107,17 @@ function statusText(
 async function testProvider(
   ctx: ExtensionCommandContext,
   provider: WebSearchProviderName,
-  deps: Required<WebToolsCommandDependencies>,
+  config: ResolvedWebToolsConfig,
+  search: typeof searchWeb,
 ): Promise<void> {
-  const base = resolveConfig(
-    await deps.readConfig(getConfigPath()),
-    deps.env,
-  ).search;
-  const config: ResolvedWebSearchConfig = {
-    ...base,
+  const searchConfig: ResolvedWebSearchConfig = {
+    ...config.search,
     provider,
     fallback: false,
   };
-  const response = await deps.search(
+  const response = await search(
     { query: DEFAULT_SEARCH_QUERY, maxResults: 1 },
-    config,
+    searchConfig,
     { modelRegistry: ctx.modelRegistry },
     ctx.signal,
   );
@@ -122,14 +128,25 @@ async function testProvider(
   );
 }
 
+async function loadSnapshot(
+  provided: WebToolsCommandDependencies,
+  env: NodeJS.ProcessEnv,
+): Promise<WebToolsConfigSnapshot> {
+  if (provided.config) return provided.config;
+  const rawConfig = await (provided.readConfig ?? readConfig)(getConfigPath());
+  return { rawConfig, resolvedConfig: resolveConfig(rawConfig, env) };
+}
+
 export function registerWebToolsCommand(
   pi: ExtensionAPI,
   provided: WebToolsCommandDependencies = {},
 ): void {
-  const deps: Required<WebToolsCommandDependencies> = {
-    readConfig: provided.readConfig ?? readConfig,
-    search: provided.search ?? searchWeb,
-    env: provided.env ?? process.env,
+  const env = { ...(provided.env ?? process.env) };
+  const search = provided.search ?? searchWeb;
+  let snapshotPromise: Promise<WebToolsConfigSnapshot> | undefined;
+  const snapshot = (): Promise<WebToolsConfigSnapshot> => {
+    snapshotPromise ??= loadSnapshot(provided, env);
+    return snapshotPromise;
   };
   pi.registerCommand("web-tools", {
     description: "Inspect or test web-tools search configuration.",
@@ -145,8 +162,9 @@ export function registerWebToolsCommand(
       try {
         const [command, providerValue] = args.trim().split(/\s+/, 2);
         if (command === "status") {
+          const { rawConfig, resolvedConfig } = await snapshot();
           ctx.ui.notify(
-            statusText(await deps.readConfig(getConfigPath()), ctx, deps.env),
+            statusText(rawConfig, resolvedConfig, ctx, env),
             "info",
           );
         } else if (command === "test") {
@@ -158,7 +176,8 @@ export function registerWebToolsCommand(
             );
             return;
           }
-          await testProvider(ctx, provider, deps);
+          const { resolvedConfig } = await snapshot();
+          await testProvider(ctx, provider, resolvedConfig, search);
         } else {
           ctx.ui.notify(
             "/web-tools status\n/web-tools test <searxng|codex-alpha-search|codex>",

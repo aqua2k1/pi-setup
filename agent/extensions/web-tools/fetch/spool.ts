@@ -29,6 +29,41 @@ export interface TempSpool {
   cleanup(): Promise<void>;
 }
 
+type TempSpoolState = "open" | "closed" | "finalizing" | "finalized";
+
+function stateError(state: TempSpoolState): WebFetchError {
+  if (state === "finalized" || state === "finalizing") {
+    return new WebFetchError(
+      "invalid-response",
+      "The fetch response has already been finalized.",
+    );
+  }
+  return new WebFetchError(
+    "invalid-response",
+    "The fetch response spool is closed.",
+  );
+}
+
+async function writeFully(
+  handle: Awaited<ReturnType<typeof open>>,
+  chunk: Uint8Array,
+): Promise<void> {
+  let offset = 0;
+  while (offset < chunk.byteLength) {
+    const result = await handle.write(chunk.subarray(offset));
+    if (
+      result.bytesWritten <= 0 ||
+      result.bytesWritten > chunk.byteLength - offset
+    ) {
+      throw new WebFetchError(
+        "invalid-response",
+        "The fetch response could not be written completely.",
+      );
+    }
+    offset += result.bytesWritten;
+  }
+}
+
 export function limitUtf8Text(
   text: string,
   maxBytes = MAX_FETCH_CONTENT_BYTES,
@@ -70,13 +105,33 @@ export async function createTempSpool(
     throw error;
   }
   let bytes = 0;
-  let closed = false;
-  let finalized = false;
+  let state: TempSpoolState = "open";
+  let writes: Promise<void> = Promise.resolve();
+  let handleClosePromise: Promise<void> | undefined;
+
+  const closeHandle = (): Promise<void> => {
+    handleClosePromise ??= handle.close();
+    return handleClosePromise;
+  };
+
+  const drainAndClose = async () => {
+    let failure: unknown;
+    try {
+      await writes;
+    } catch (error) {
+      failure = error;
+    }
+    try {
+      await closeHandle();
+    } catch (error) {
+      failure ??= error;
+    }
+    if (failure) throw failure;
+  };
 
   const close = async () => {
-    if (closed) return;
-    closed = true;
-    await handle.close();
+    if (state === "open") state = "closed";
+    await drainAndClose();
   };
 
   const cleanup = async () => {
@@ -92,23 +147,23 @@ export async function createTempSpool(
       return bytes;
     },
     async write(chunk: Uint8Array) {
-      if (finalized) {
-        throw new WebFetchError(
-          "invalid-response",
-          "The fetch response has already been finalized.",
-        );
-      }
+      if (state !== "open") throw stateError(state);
       if (bytes + chunk.byteLength > MAX_FETCH_CONTENT_BYTES) {
         throw new WebFetchError(
           "invalid-response",
           "The fetch response exceeds the 1 MiB limit.",
         );
       }
-      await handle.write(chunk);
       bytes += chunk.byteLength;
+      writes = writes.then(() => writeFully(handle, chunk));
+      await writes;
     },
     close,
     async saveText(text: string) {
+      if (state === "finalized" || state === "finalizing") {
+        throw stateError(state);
+      }
+      state = "finalizing";
       await close();
       const bounded = limitUtf8Text(text);
       await writeFile(contentPath, bounded.text, {
@@ -117,7 +172,7 @@ export async function createTempSpool(
         flag: "wx",
       });
       await rm(responsePath, { force: true });
-      finalized = true;
+      state = "finalized";
       return bounded;
     },
     cleanup,

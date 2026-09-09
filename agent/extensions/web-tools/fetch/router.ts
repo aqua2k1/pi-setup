@@ -4,7 +4,6 @@ import { MAX_URL_LENGTH } from "../shared/limits.ts";
 import { assertNotCancelled, WebFetchError } from "./errors.ts";
 import { GitHubHandler } from "./github.ts";
 import { fetchDocument } from "./http.ts";
-import { cleanupExpiredSpools } from "./spool.ts";
 import type { FetchRequest, FetchResponse, FetchRuntime } from "./types.ts";
 
 export function createFetchRuntime(): FetchRuntime {
@@ -112,6 +111,5 @@ export async function fetchWeb(
 ): Promise<FetchResponse> {
   const normalized = normalizeFetchRequest(request);
   assertNotCancelled(signal);
-  void cleanupExpiredSpools(undefined, (runtime.now ?? Date.now)());
   return new WebFetchRouter(config, runtime).fetch(normalized, signal);
 }

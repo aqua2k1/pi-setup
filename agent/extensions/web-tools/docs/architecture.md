@@ -102,7 +102,8 @@ The model receives a small inline result for short content and a preview plus
 
 The raw response is first streamed through a bounded `response.bin` and is then
 converted to `content.txt`; the intermediate file is removed. Failed or
-cancelled operations remove the directory.
+cancelled operations remove the directory. Expired spool cleanup is owned by
+extension startup rather than detached from individual fetch requests.
 
 ## GitHub strategy
 
@@ -117,14 +118,16 @@ https://github.com/{owner}/{repo}/tree/{ref}/{path}
 Issue, pull request, release, action, wiki and other UI pages use native HTTP.
 
 `mode=auto` resolves repository metadata through `gh api`. Small repositories
-use a shallow, single-branch clone. The clone is cached under a hashed key so
-owner, repository and ref cannot create arbitrary local paths. The repository
-path is returned as `repositoryPath`; generated tree or file content is also
-saved to `content.txt`.
+use a shallow, single-branch clone. Repositories known to exceed the configured
+threshold are never cloned: GitHub code-content handling is API-only, with
+ordinary native HTTP still available when the GitHub API cannot serve the URL.
+The clone is cached under a hashed key so owner, repository and ref cannot create arbitrary
+local paths. The repository path is returned as `repositoryPath`; generated
+tree or file content is also saved to `content.txt`.
 
 The clone does not recurse into submodules, install dependencies, run hooks,
 or execute repository files. A clone timeout, missing command or failed clone
-can fall back to API access. `mode=api` never clones.
+for an eligible repository can fall back to API access. `mode=api` never clones.
 
 `gh` owns GitHub authentication. The extension invokes `gh` and `git` with
 argument arrays and `shell: false`; tokens are not placed in arguments.
