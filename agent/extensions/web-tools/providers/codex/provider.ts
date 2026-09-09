@@ -47,7 +47,7 @@ export function buildCodexSearchPayload(
           ...(request.recencyDays !== undefined
             ? { recency: request.recencyDays }
             : {}),
-          ...(request.domains?.length ? { domains: request.domains } : {}),
+          ...(request.domains?.length ? { domains: [...request.domains] } : {}),
         },
       ],
     },

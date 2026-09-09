@@ -13,15 +13,14 @@ import type {
 } from "./types.ts";
 import { normalizeSearchRequest } from "./validation.ts";
 
-export type ProviderFactories = Record<
-  WebSearchProviderName,
-  () => SearchProvider
+export type ProviderFactories = Readonly<
+  Record<WebSearchProviderName, () => SearchProvider>
 >;
 
 export interface SearchRoute {
-  provider: WebSearchProviderName;
-  fallback: boolean;
-  fallbackProvider?: WebSearchProviderName;
+  readonly provider: WebSearchProviderName;
+  readonly fallback: boolean;
+  readonly fallbackProvider?: WebSearchProviderName;
 }
 
 /** Only routing policy lives here. Factories own configuration and credentials. */
@@ -29,7 +28,7 @@ export class WebSearchRouter {
   private readonly providers: ProviderFactories;
 
   constructor(providers: ProviderFactories) {
-    this.providers = providers;
+    this.providers = { ...providers };
   }
 
   async search(

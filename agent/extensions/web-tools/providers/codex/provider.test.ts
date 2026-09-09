@@ -40,6 +40,21 @@ test("Codex validates model and deadline settings before any auth or transport",
   );
 });
 
+test("Codex payload snapshots mutable request domains", () => {
+  const domains = ["openai.com"];
+  const payload = buildCodexSearchPayload(
+    { query: "test", maxResults: 1, domains },
+    "gpt-5.4",
+    "search-id",
+  );
+  domains.push("example.com");
+  assert.deepEqual(
+    (payload.commands as { search_query: { domains: string[] }[] })
+      .search_query[0]?.domains,
+    ["openai.com"],
+  );
+});
+
 test("Codex sends the fixed endpoint, required headers and alpha/search payload", async () => {
   let calledUrl = "";
   let calledInit: RequestInit | undefined;

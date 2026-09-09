@@ -46,7 +46,7 @@ function cloneDirectory(basePath: string, key: string): string {
 
 async function cleanupExpiredClones(
   basePath: string,
-  now = Date.now(),
+  now: number,
 ): Promise<void> {
   let entries: string[];
   try {
@@ -103,11 +103,15 @@ export interface GitHubHandlerOptions {
 export class GitHubHandler implements FetchHandler {
   private readonly config: ResolvedGitHubFetchConfig;
   private readonly gh: GhClient;
+  private readonly now: () => number;
+  private readonly uuid: () => string;
   private readonly clones = new Map<string, Promise<string | null>>();
   private cloneCount = 0;
 
   constructor(options: GitHubHandlerOptions) {
-    this.config = options.config;
+    this.config = { ...options.config };
+    this.now = options.runtime?.now ?? Date.now;
+    this.uuid = options.runtime?.uuid ?? randomUUID;
     this.gh = new GhClient({
       command: options.runtime?.command,
       timeoutMs: options.config.cloneTimeoutSeconds * 1_000,
@@ -118,16 +122,20 @@ export class GitHubHandler implements FetchHandler {
     request: FetchRequest,
     signal?: AbortSignal,
   ): Promise<FetchResponse | null> {
+    const stableRequest: FetchRequest = {
+      url: new URL(request.url.toString()),
+      raw: request.raw,
+    };
     if (!this.config.enabled) return null;
-    const info = parseGitHubUrl(request.url);
+    const info = parseGitHubUrl(stableRequest.url);
     if (!info) return null;
     assertNotCancelled(signal);
 
-    await cleanupExpiredClones(this.config.clonePath);
+    await cleanupExpiredClones(this.config.clonePath, this.now());
     const metadata = await this.gh.repoMetadata(info.owner, info.repo, signal);
     const ref = info.ref ?? metadata?.defaultBranch;
     if (info.refIsFullSha || this.config.mode === "api") {
-      return (await this.fetchViaApi(request, info, ref, signal)) ?? null;
+      return (await this.fetchViaApi(stableRequest, info, ref, signal)) ?? null;
     }
 
     if (
@@ -135,7 +143,12 @@ export class GitHubHandler implements FetchHandler {
       metadata?.sizeMB !== undefined &&
       metadata.sizeMB > this.config.maxRepoSizeMB
     ) {
-      const apiResult = await this.fetchViaApi(request, info, ref, signal);
+      const apiResult = await this.fetchViaApi(
+        stableRequest,
+        info,
+        ref,
+        signal,
+      );
       if (apiResult) return apiResult;
     }
 
@@ -147,7 +160,12 @@ export class GitHubHandler implements FetchHandler {
         error instanceof WebFetchError &&
         ["request", "timeout", "tool-unavailable"].includes(error.code)
       ) {
-        const apiResult = await this.fetchViaApi(request, info, ref, signal);
+        const apiResult = await this.fetchViaApi(
+          stableRequest,
+          info,
+          ref,
+          signal,
+        );
         if (apiResult) return apiResult;
         return null;
       }
@@ -156,7 +174,7 @@ export class GitHubHandler implements FetchHandler {
     if (cloned) {
       const content = await generateCloneContent(cloned, info);
       return this.storeResponse(
-        request,
+        stableRequest,
         content.text,
         content.title,
         content.contentType,
@@ -167,7 +185,7 @@ export class GitHubHandler implements FetchHandler {
       );
     }
 
-    return this.fetchViaApi(request, info, ref, signal);
+    return this.fetchViaApi(stableRequest, info, ref, signal);
   }
 
   private async getOrClone(
@@ -217,7 +235,7 @@ export class GitHubHandler implements FetchHandler {
     const parent = this.config.clonePath;
     await mkdir(parent, { recursive: true, mode: 0o700 });
     await chmod(parent, 0o700).catch(() => {});
-    const temporaryPath = join(parent, `${CLONE_TEMP_PREFIX}${randomUUID()}`);
+    const temporaryPath = join(parent, `${CLONE_TEMP_PREFIX}${this.uuid()}`);
     await rm(finalPath, { recursive: true, force: true });
     await rm(temporaryPath, { recursive: true, force: true });
     try {
@@ -389,7 +407,7 @@ export class GitHubHandler implements FetchHandler {
         contentLength,
         finalUrl: request.url.toString(),
         source,
-        expiresAt: new Date(Date.now() + TEMP_SPOOL_TTL_MS).toISOString(),
+        expiresAt: new Date(this.now() + TEMP_SPOOL_TTL_MS).toISOString(),
         fullOutputPath: spool.contentPath,
         ...(repositoryPath ? { repositoryPath } : {}),
         ...(truncated

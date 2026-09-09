@@ -85,11 +85,15 @@ npx biome format --write .
 
 ## Configuration
 
-Configuration is read from:
+Configuration is read and validated once when the extension loads:
 
 ```text
 ~/.pi/agent/web-tools-config.json
 ```
+
+A malformed configuration prevents the extension from registering instead of
+failing later when a tool is called. Reload the extension after changing the
+configuration file or environment variables.
 
 The file has separate `search` and `fetch` sections. Copy the example:
 

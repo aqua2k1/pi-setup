@@ -2,8 +2,14 @@ import assert from "node:assert/strict";
 import { readFile, rm, stat } from "node:fs/promises";
 import { test } from "node:test";
 import { resolveConfig } from "../config.ts";
+import { TEMP_SPOOL_TTL_MS } from "../shared/limits.ts";
 import { WebFetchError } from "./errors.ts";
-import { fetchWeb, normalizeFetchRequest } from "./router.ts";
+import {
+  createFetchRuntime,
+  fetchWeb,
+  normalizeFetchRequest,
+  WebFetchRouter,
+} from "./router.ts";
 
 async function cleanup(path: string): Promise<void> {
   await rm(path.substring(0, path.lastIndexOf("/")), {
@@ -37,10 +43,12 @@ test("fetchWeb uses native HTTP for ordinary URLs and saves full text", async ()
       new Response("hello world", {
         headers: { "content-type": "text/plain" },
       }),
+    now: () => 0,
   });
   try {
     assert.equal(response.source, "native-http");
     assert.equal(response.text, "hello world");
+    assert.equal(response.expiresAt, new Date(TEMP_SPOOL_TTL_MS).toISOString());
     assert.equal(
       await readFile(response.fullOutputPath, "utf8"),
       "hello world",
@@ -49,4 +57,17 @@ test("fetchWeb uses native HTTP for ordinary URLs and saves full text", async ()
   } finally {
     await cleanup(response.fullOutputPath);
   }
+});
+
+test("fetch runtimes own GitHub handler caches explicitly", () => {
+  const config = resolveConfig({}, {}).fetch;
+  const first = createFetchRuntime();
+  const second = createFetchRuntime();
+  new WebFetchRouter(config, first);
+  new WebFetchRouter(config, first);
+  new WebFetchRouter(config, second);
+  const key = JSON.stringify(config.github);
+  assert.ok(first.githubHandlerCache?.get(key));
+  assert.ok(second.githubHandlerCache?.get(key));
+  assert.notEqual(first.githubHandlerCache, second.githubHandlerCache);
 });

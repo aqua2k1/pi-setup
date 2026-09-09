@@ -39,7 +39,8 @@ export function searchWeb(
         model: config.codexModel,
         timeoutMs: config.timeoutMs,
         fetch: runtime.fetch,
-        resolveAuth: () => resolveCodexAuth(runtime.modelRegistry),
+        resolveAuth: (authSignal) =>
+          resolveCodexAuth(runtime.modelRegistry, authSignal),
       }),
   });
   return router.search(

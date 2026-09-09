@@ -1,5 +1,5 @@
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { WebSearchError } from "../../core/errors.ts";
+import { assertNotCancelled, WebSearchError } from "../../core/errors.ts";
 import { isSafeHeaderValue } from "../../shared/http.ts";
 import { isRecord } from "../../shared/results.ts";
 
@@ -38,9 +38,12 @@ export function extractCodexAccountId(token: string): string | undefined {
 /** Pi owns storage/refresh. No model lookup, auth.json access or provider URL overrides. */
 export async function resolveCodexAuth(
   registry?: CodexModelRegistry,
+  signal?: AbortSignal,
 ): Promise<CodexRequestAuth> {
+  assertNotCancelled(signal);
   try {
     const resolved = await registry?.getProviderAuth(CODEX_PROVIDER_NAME);
+    assertNotCancelled(signal);
     const accessToken = resolved?.auth.apiKey;
     // Pi's OAuth resolver stamps this source; API-key/config overrides must not qualify.
     if (
@@ -52,7 +55,10 @@ export async function resolveCodexAuth(
     const accountId = extractCodexAccountId(accessToken);
     if (!accountId) throw new Error();
     return { accessToken, accountId };
-  } catch {
+  } catch (error) {
+    if (error instanceof WebSearchError && error.code === "cancelled") {
+      throw error;
+    }
     throw new WebSearchError(
       "auth",
       "OpenAI Codex OAuth is unavailable. Run /login openai-codex.",

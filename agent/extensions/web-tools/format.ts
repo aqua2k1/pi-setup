@@ -24,7 +24,7 @@ export function buildSearchOutput(response: RoutedSearchResponse): {
   content: { type: "text"; text: string }[];
   details: SearchDetails;
 } {
-  const results = [...response.results];
+  const results = response.results.map((result) => ({ ...result }));
   let truncated = Boolean(response.truncated);
   while (true) {
     const sections: string[] = [];
@@ -52,7 +52,7 @@ export function buildSearchOutput(response: RoutedSearchResponse): {
         query: response.query,
         backend: response.provider,
         resultCount: results.length,
-        results,
+        results: results.map((result) => ({ ...result })),
         hasSummary: Boolean(response.summary),
         ...(truncated ? { truncated: true } : {}),
       },

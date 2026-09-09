@@ -21,6 +21,7 @@ const ACCEPT =
 export interface FetchDocumentOptions {
   timeoutMs: number;
   fetch?: FetchLike;
+  now?: () => number;
 }
 
 function contentLength(response: Response): number | undefined {
@@ -162,7 +163,9 @@ export async function fetchDocument(
         finalUrl: response.url || url,
         source: "native-http",
         fullOutputPath: spool.contentPath,
-        expiresAt: new Date(Date.now() + TEMP_SPOOL_TTL_MS).toISOString(),
+        expiresAt: new Date(
+          (options.now ?? Date.now)() + TEMP_SPOOL_TTL_MS,
+        ).toISOString(),
         ...(document.truncated || bounded.truncated
           ? {
               truncation: {

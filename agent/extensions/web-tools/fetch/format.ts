@@ -6,16 +6,16 @@ import {
 import type { FetchResponse } from "./types.ts";
 
 export interface FetchDetails {
-  url: string;
-  finalUrl: string;
-  title?: string;
-  contentType?: string;
-  contentLength?: number;
-  source: FetchResponse["source"];
-  fullOutputPath: string;
-  repositoryPath?: string;
-  truncation?: FetchResponse["truncation"];
-  expiresAt?: string;
+  readonly url: string;
+  readonly finalUrl: string;
+  readonly title?: string;
+  readonly contentType?: string;
+  readonly contentLength?: number;
+  readonly source: FetchResponse["source"];
+  readonly fullOutputPath: string;
+  readonly repositoryPath?: string;
+  readonly truncation?: FetchResponse["truncation"];
+  readonly expiresAt?: string;
 }
 
 function escapeHeader(value: string): string {
@@ -71,6 +71,9 @@ export function buildFetchOutput(response: FetchResponse): {
 } {
   const preview = boundedPreview(response.text);
   const inlineFull = !preview.truncated;
+  const truncation = response.truncation
+    ? { ...response.truncation }
+    : undefined;
   const lines = [
     `**Fetched:** ${displayUrl(response.finalUrl)}`,
     ...(response.title ? [`**Title:** ${escapeHeader(response.title)}`] : []),
@@ -93,10 +96,10 @@ export function buildFetchOutput(response: FetchResponse): {
       "Full content is available at the path above; Use the `read` tool to inspect it.",
     );
   }
-  if (response.truncation) {
+  if (truncation) {
     lines.push(
       "",
-      `[Content limited to ${response.truncation.outputBytes} of ${response.truncation.totalBytes} bytes.]`,
+      `[Content limited to ${truncation.outputBytes} of ${truncation.totalBytes} bytes.]`,
     );
   }
 
@@ -121,7 +124,7 @@ export function buildFetchOutput(response: FetchResponse): {
       ...(response.repositoryPath
         ? { repositoryPath: response.repositoryPath }
         : {}),
-      ...(response.truncation ? { truncation: response.truncation } : {}),
+      ...(truncation ? { truncation } : {}),
       ...(response.expiresAt ? { expiresAt: response.expiresAt } : {}),
     },
   };

@@ -19,14 +19,14 @@ export const WEB_SEARCH_ERROR_CODES = [
 export type WebSearchErrorCode = (typeof WEB_SEARCH_ERROR_CODES)[number];
 
 export interface SearchAttempt {
-  provider: WebSearchProviderName;
-  code: WebSearchErrorCode;
+  readonly provider: WebSearchProviderName;
+  readonly code: WebSearchErrorCode;
 }
 
 export interface WebSearchErrorOptions {
   provider?: string;
   status?: number;
-  attempts?: SearchAttempt[];
+  attempts?: readonly SearchAttempt[];
 }
 
 /**
@@ -38,7 +38,7 @@ export class WebSearchError extends Error {
   readonly code: WebSearchErrorCode;
   readonly provider?: string;
   readonly status?: number;
-  readonly attempts?: SearchAttempt[];
+  readonly attempts?: readonly SearchAttempt[];
 
   constructor(
     code: WebSearchErrorCode,
@@ -51,7 +51,10 @@ export class WebSearchError extends Error {
     this.code = code;
     this.provider = options.provider;
     this.status = options.status;
-    this.attempts = options.attempts;
+    this.attempts = options.attempts?.map(({ provider, code }) => ({
+      provider,
+      code,
+    }));
   }
 }
 

@@ -151,7 +151,10 @@ function safeText(text: string, redact: (text: string) => string): string {
   return redact(urls).replace(/\s+/g, " ").trim();
 }
 
-function withinDomains(url: string, domains: string[] | undefined): boolean {
+function withinDomains(
+  url: string,
+  domains: readonly string[] | undefined,
+): boolean {
   if (!domains?.length) return true;
   const hostname = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
   return domains.some((domain) => {

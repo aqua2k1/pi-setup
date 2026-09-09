@@ -5,14 +5,16 @@ import { registerWebToolsCommand } from "./commands.ts";
 import type { FetchWebRequest } from "./composition.ts";
 import { fetchWeb, searchWeb } from "./composition.ts";
 import {
+  type ResolvedWebFetchConfig,
+  type ResolvedWebSearchConfig,
   readConfig,
-  resolveFetchConfig,
-  resolveSearchConfig,
+  resolveConfig,
 } from "./config.ts";
 import { toWebSearchError } from "./core/errors.ts";
 import { WEB_SEARCH_PROVIDER_NAMES } from "./core/types.ts";
 import { toWebFetchError } from "./fetch/errors.ts";
 import { buildFetchOutput } from "./fetch/format.ts";
+import { createFetchRuntime } from "./fetch/router.ts";
 import type { FetchRuntime } from "./fetch/types.ts";
 import { buildSearchOutput } from "./format.ts";
 import {
@@ -76,12 +78,15 @@ const FetchParameters = Type.Object({
   ),
 });
 
-interface ToolDependencies {
-  readConfig?: typeof readConfig;
+export interface WebSearchToolDependencies {
+  searchConfig: ResolvedWebSearchConfig;
   search?: typeof searchWeb;
+}
+
+export interface WebFetchToolDependencies {
+  fetchConfig: ResolvedWebFetchConfig;
   fetch?: typeof fetchWeb;
   fetchRuntime?: FetchRuntime;
-  env?: NodeJS.ProcessEnv;
 }
 
 function progressHost(rawUrl: string): string {
@@ -94,7 +99,7 @@ function progressHost(rawUrl: string): string {
 
 export function registerWebSearchTool(
   pi: ExtensionAPI,
-  dependencies: ToolDependencies = {},
+  dependencies: WebSearchToolDependencies,
 ): void {
   pi.registerTool({
     name: "web_search",
@@ -110,10 +115,7 @@ export function registerWebSearchTool(
     parameters: SearchParameters,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       try {
-        const raw = await (dependencies.readConfig ?? readConfig)();
-        const searchConfig = {
-          ...resolveSearchConfig(raw.search, dependencies.env),
-        };
+        const searchConfig = { ...dependencies.searchConfig };
         if (params.provider) searchConfig.provider = params.provider;
         onUpdate?.({
           content: [
@@ -142,8 +144,9 @@ export function registerWebSearchTool(
 
 export function registerWebFetchTool(
   pi: ExtensionAPI,
-  dependencies: ToolDependencies = {},
+  dependencies: WebFetchToolDependencies,
 ): void {
+  const fetchRuntime = dependencies.fetchRuntime ?? createFetchRuntime();
   pi.registerTool({
     name: "web_fetch",
     label: "Web Fetch",
@@ -159,8 +162,7 @@ export function registerWebFetchTool(
     parameters: FetchParameters,
     async execute(_toolCallId, params, signal, onUpdate) {
       try {
-        const raw = await (dependencies.readConfig ?? readConfig)();
-        const fetchConfig = resolveFetchConfig(raw.fetch);
+        const fetchConfig = dependencies.fetchConfig;
         const request: FetchWebRequest = {
           url: params.url,
           raw: params.raw,
@@ -177,7 +179,7 @@ export function registerWebFetchTool(
         const response = await (dependencies.fetch ?? fetchWeb)(
           request,
           fetchConfig,
-          dependencies.fetchRuntime ?? {},
+          fetchRuntime,
           signal,
         );
         return buildFetchOutput(response);
@@ -188,8 +190,22 @@ export function registerWebFetchTool(
   });
 }
 
-export default function webToolsExtension(pi: ExtensionAPI): void {
-  registerWebSearchTool(pi);
-  registerWebFetchTool(pi);
-  registerWebToolsCommand(pi);
+export interface WebToolsExtensionDependencies {
+  readConfig?: typeof readConfig;
+  env?: NodeJS.ProcessEnv;
+}
+
+export default async function webToolsExtension(
+  pi: ExtensionAPI,
+  dependencies: WebToolsExtensionDependencies = {},
+): Promise<void> {
+  try {
+    const raw = await (dependencies.readConfig ?? readConfig)();
+    const config = resolveConfig(raw, dependencies.env);
+    registerWebSearchTool(pi, { searchConfig: config.search });
+    registerWebFetchTool(pi, { fetchConfig: config.fetch });
+    registerWebToolsCommand(pi);
+  } catch (error) {
+    throw toWebSearchError(error);
+  }
 }

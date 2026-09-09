@@ -7,6 +7,7 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { searchWeb } from "./composition.ts";
+import { resolveFetchConfig, resolveSearchConfig } from "./config.ts";
 import { WebSearchError } from "./core/errors.ts";
 import type { FetchResponse } from "./fetch/types.ts";
 import webToolsExtension, {
@@ -25,40 +26,68 @@ const context = {
 } as unknown as ExtensionContext;
 
 function captureSearch(
-  dependencies: Parameters<typeof registerWebSearchTool>[1] = {},
+  dependencies: Partial<Parameters<typeof registerWebSearchTool>[1]> = {},
 ): ToolDefinition {
   const tools: ToolDefinition[] = [];
   registerWebSearchTool(
     {
       registerTool: (tool: ToolDefinition) => tools.push(tool),
     } as unknown as ExtensionAPI,
-    { env: {}, ...dependencies },
+    {
+      ...dependencies,
+      searchConfig: dependencies.searchConfig ?? resolveSearchConfig({}, {}),
+    },
   );
   assert.equal(tools.length, 1);
   return tools[0];
 }
 
 function captureFetch(
-  dependencies: Parameters<typeof registerWebFetchTool>[1] = {},
+  dependencies: Partial<Parameters<typeof registerWebFetchTool>[1]> = {},
 ): ToolDefinition {
   const tools: ToolDefinition[] = [];
   registerWebFetchTool(
     {
       registerTool: (tool: ToolDefinition) => tools.push(tool),
     } as unknown as ExtensionAPI,
-    { env: {}, ...dependencies },
+    {
+      ...dependencies,
+      fetchConfig: dependencies.fetchConfig ?? resolveFetchConfig({}),
+    },
   );
   assert.equal(tools.length, 1);
   return tools[0];
 }
 
-test("the extension entrypoint registers search, fetch and the web-tools command", () => {
+test("the extension entrypoint validates config before registering tools", async () => {
   const names: string[] = [];
-  webToolsExtension({
-    registerTool: (tool: ToolDefinition) => names.push(tool.name),
-    registerCommand: (name: string) => names.push(name),
-  } as unknown as ExtensionAPI);
+  await webToolsExtension(
+    {
+      registerTool: (tool: ToolDefinition) => names.push(tool.name),
+      registerCommand: (name: string) => names.push(name),
+    } as unknown as ExtensionAPI,
+    { readConfig: async () => ({}), env: {} },
+  );
   assert.deepEqual(names, ["web_search", "web_fetch", "web-tools"]);
+});
+
+test("invalid config fails extension loading before tool registration", async () => {
+  const names: string[] = [];
+  await assert.rejects(
+    webToolsExtension(
+      {
+        registerTool: (tool: ToolDefinition) => names.push(tool.name),
+        registerCommand: (name: string) => names.push(name),
+      } as unknown as ExtensionAPI,
+      {
+        readConfig: async () => ({ search: { maxResults: 0 } }),
+        env: {},
+      },
+    ),
+    (error: unknown) =>
+      error instanceof WebSearchError && error.code === "invalid-config",
+  );
+  assert.deepEqual(names, []);
 });
 
 test("web_search registers the public parameter schema", () => {
@@ -85,20 +114,62 @@ test("web_fetch registers the URL and raw schema", () => {
   assert.equal(schema.properties.raw.type, "boolean");
 });
 
+test("registered search tool uses its resolved config", async () => {
+  const tool = captureSearch({
+    searchConfig: resolveSearchConfig({ maxResults: 7 }, {}),
+    search: async (request, config) => {
+      assert.equal(config.maxResults, 7);
+      return {
+        provider: "searxng",
+        query: request.query,
+        results: [],
+      };
+    },
+  });
+  await tool.execute(
+    "search-call",
+    { query: "test" },
+    undefined,
+    undefined,
+    context,
+  );
+});
+
+test("registered fetch tool uses its resolved config", async () => {
+  const tool = captureFetch({
+    fetchConfig: resolveFetchConfig({ timeoutMs: 1_000 }),
+    fetch: async (_request, config) => {
+      assert.equal(config.timeoutMs, 1_000);
+      return {
+        text: "fixture",
+        finalUrl: "https://example.com/page",
+        source: "native-http",
+        fullOutputPath: "/tmp/pi-web-fetch-test/content.txt",
+      };
+    },
+  });
+  await tool.execute(
+    "fetch-call",
+    { url: "https://example.com/page" },
+    undefined,
+    undefined,
+    context,
+  );
+});
+
 for (const provider of ["searxng", "codex-alpha-search"] as const) {
   test(`${provider}: search composition does not leak credentials`, async () => {
     const credential = provider === "searxng" ? key : token;
     const reflection = `${credential} ${encodeURIComponent(credential)} ${Buffer.from(credential).toString("base64")} fixture-account-123`;
-    const tool = captureSearch({
-      readConfig: async () => ({ search: {}, fetch: {} }),
-      ...(provider === "searxng"
+    const env =
+      provider === "searxng"
         ? {
-            env: {
-              SEARXNG_URL: "https://search.example",
-              SEARXNG_API_KEY: key,
-            },
+            SEARXNG_URL: "https://search.example",
+            SEARXNG_API_KEY: key,
           }
-        : {}),
+        : {};
+    const tool = captureSearch({
+      searchConfig: resolveSearchConfig({}, env),
       search: (request, config, runtime, signal) =>
         searchWeb(
           request,
@@ -165,7 +236,7 @@ test("web_fetch uses the fetch composition and reports a temp path", async () =>
     fullOutputPath: "/tmp/pi-web-fetch-test/content.txt",
   };
   const tool = captureFetch({
-    readConfig: async () => ({ search: {}, fetch: {} }),
+    fetchConfig: resolveFetchConfig({}),
     fetch: async () => response,
   });
   const updates: unknown[] = [];
@@ -186,10 +257,7 @@ test("web_fetch uses the fetch composition and reports a temp path", async () =>
 
 test("web_fetch uses the real native composition when a fetch runtime is injected", async () => {
   const tool = captureFetch({
-    readConfig: async () => ({
-      search: {},
-      fetch: { github: { enabled: false } },
-    }),
+    fetchConfig: resolveFetchConfig({ github: { enabled: false } }),
     fetchRuntime: {
       fetch: async () =>
         new Response("<title>Fixture</title><p>hello</p>", {
@@ -222,20 +290,20 @@ test("web_fetch uses the real native composition when a fetch runtime is injecte
   );
 });
 
-test("tool catches config failures before any progress update", async () => {
-  const tool = captureSearch({
-    readConfig: async () => {
-      throw new Error(key);
-    },
-  });
-  const updates: unknown[] = [];
+test("config read failures are classified during extension loading", async () => {
+  const names: string[] = [];
   await assert.rejects(
-    tool.execute(
-      "test",
-      { query: "test" },
-      undefined,
-      (update) => updates.push(update),
-      context,
+    webToolsExtension(
+      {
+        registerTool: (tool: ToolDefinition) => names.push(tool.name),
+        registerCommand: (name: string) => names.push(name),
+      } as unknown as ExtensionAPI,
+      {
+        readConfig: async () => {
+          throw new Error(key);
+        },
+        env: {},
+      },
     ),
     (error: unknown) => {
       assert.ok(error instanceof WebSearchError);
@@ -243,27 +311,5 @@ test("tool catches config failures before any progress update", async () => {
       return true;
     },
   );
-  assert.deepEqual(updates, []);
-});
-
-test("web_fetch errors do not expose raw configuration exceptions", async () => {
-  const tool = captureFetch({
-    readConfig: async () => {
-      throw new Error(key);
-    },
-  });
-  await assert.rejects(
-    tool.execute(
-      "test",
-      { url: "https://example.com" },
-      undefined,
-      undefined,
-      context,
-    ),
-    (error: unknown) => {
-      assert.ok(error instanceof Error);
-      assert.ok(!`${error.stack} ${JSON.stringify(error)}`.includes(key));
-      return true;
-    },
-  );
+  assert.deepEqual(names, []);
 });

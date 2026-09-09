@@ -6,24 +6,24 @@ export const WEB_SEARCH_PROVIDER_NAMES = [
 export type WebSearchProviderName = (typeof WEB_SEARCH_PROVIDER_NAMES)[number];
 
 export interface SearchRequest {
-  query: string;
-  maxResults: number;
-  domains?: string[];
-  recencyDays?: number;
+  readonly query: string;
+  readonly maxResults: number;
+  readonly domains?: readonly string[];
+  readonly recencyDays?: number;
 }
 
 export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
+  readonly title: string;
+  readonly url: string;
+  readonly snippet: string;
 }
 
 /** Providers return sanitized, bounded data, never their raw wire response. */
 export interface SearchResponse {
-  query: string;
-  results: SearchResult[];
-  summary?: string;
-  truncated?: boolean;
+  readonly query: string;
+  readonly results: readonly SearchResult[];
+  readonly summary?: string;
+  readonly truncated?: boolean;
 }
 
 /** The router passes a normalized request to each provider. */
@@ -32,5 +32,5 @@ export interface SearchProvider {
 }
 
 export interface RoutedSearchResponse extends SearchResponse {
-  provider: WebSearchProviderName;
+  readonly provider: WebSearchProviderName;
 }

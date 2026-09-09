@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { ResolvedWebFetchConfig } from "../config.ts";
 import { MAX_URL_LENGTH } from "../shared/limits.ts";
 import { assertNotCancelled, WebFetchError } from "./errors.ts";
@@ -6,22 +7,31 @@ import { fetchDocument } from "./http.ts";
 import { cleanupExpiredSpools } from "./spool.ts";
 import type { FetchRequest, FetchResponse, FetchRuntime } from "./types.ts";
 
-const githubHandlers = new Map<string, GitHubHandler>();
+export function createFetchRuntime(): FetchRuntime {
+  const handlers = new Map<string, import("./github.ts").GitHubHandler>();
+  return {
+    githubHandlerCache: {
+      get: (key) => handlers.get(key),
+      set: (key, handler) => handlers.set(key, handler),
+    },
+    now: Date.now,
+    uuid: randomUUID,
+  };
+}
 
 function githubHandlerFor(
   config: ResolvedWebFetchConfig,
   runtime: FetchRuntime,
 ): GitHubHandler {
   if (runtime.github) return runtime.github;
-  // The default runtime is process-local, so clone cache entries survive
-  // separate web_fetch calls. Injected runners are request-local in tests.
-  if (runtime.command)
-    return new GitHubHandler({ config: config.github, runtime });
+  const cache = runtime.githubHandlerCache;
+  if (!cache) return new GitHubHandler({ config: config.github, runtime });
+
   const key = JSON.stringify(config.github);
-  const existing = githubHandlers.get(key);
+  const existing = cache.get(key);
   if (existing) return existing;
   const handler = new GitHubHandler({ config: config.github, runtime });
-  githubHandlers.set(key, handler);
+  cache.set(key, handler);
   return handler;
 }
 
@@ -58,10 +68,16 @@ export class WebFetchRouter {
   private readonly config: ResolvedWebFetchConfig;
   private readonly runtime: FetchRuntime;
 
-  constructor(config: ResolvedWebFetchConfig, runtime: FetchRuntime = {}) {
-    this.config = config;
-    this.runtime = runtime;
-    this.github = githubHandlerFor(config, runtime);
+  constructor(
+    config: ResolvedWebFetchConfig,
+    runtime: FetchRuntime = createFetchRuntime(),
+  ) {
+    this.config = {
+      timeoutMs: config.timeoutMs,
+      github: { ...config.github },
+    };
+    this.runtime = { ...runtime };
+    this.github = githubHandlerFor(this.config, this.runtime);
   }
 
   async fetch(
@@ -69,14 +85,19 @@ export class WebFetchRouter {
     signal?: AbortSignal,
   ): Promise<FetchResponse> {
     assertNotCancelled(signal);
-    const githubResponse = await this.github.fetch(request, signal);
+    const stableRequest: FetchRequest = {
+      url: new URL(request.url.toString()),
+      raw: request.raw,
+    };
+    const githubResponse = await this.github.fetch(stableRequest, signal);
     if (githubResponse) return githubResponse;
 
     return fetchDocument(
-      request,
+      stableRequest,
       {
         timeoutMs: this.config.timeoutMs,
         fetch: this.runtime.fetch,
+        now: this.runtime.now,
       },
       signal,
     );
@@ -86,10 +107,11 @@ export class WebFetchRouter {
 export async function fetchWeb(
   request: { url: string; raw?: boolean },
   config: ResolvedWebFetchConfig,
-  runtime: FetchRuntime = {},
+  runtime: FetchRuntime = createFetchRuntime(),
   signal?: AbortSignal,
 ): Promise<FetchResponse> {
-  void cleanupExpiredSpools();
   const normalized = normalizeFetchRequest(request);
+  assertNotCancelled(signal);
+  void cleanupExpiredSpools(undefined, (runtime.now ?? Date.now)());
   return new WebFetchRouter(config, runtime).fetch(normalized, signal);
 }

@@ -131,6 +131,10 @@ argument arrays and `shell: false`; tokens are not placed in arguments.
 
 ## Configuration and boundaries
 
+Configuration is loaded and resolved once during extension startup. Registered
+search and fetch tools consume that immutable resolved snapshot; changing the
+file or environment requires an extension reload.
+
 The single configuration file is:
 
 ```text

@@ -27,6 +27,16 @@ test("buildFetchOutput returns small content inline and includes its path", () =
   assert.equal(output.details.truncation, undefined);
 });
 
+test("buildFetchOutput copies truncation details", () => {
+  const input = {
+    ...response("hello"),
+    truncation: { totalBytes: 100, outputBytes: 5 },
+  };
+  const output = buildFetchOutput(input);
+  input.truncation.totalBytes = 200;
+  assert.equal(output.details.truncation?.totalBytes, 100);
+});
+
 test("buildFetchOutput returns a bounded preview for large content", () => {
   const text = "x".repeat(MAX_FETCH_PREVIEW_BYTES + 100);
   const output = buildFetchOutput(response(text));
