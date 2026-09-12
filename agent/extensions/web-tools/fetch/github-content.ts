@@ -1,6 +1,7 @@
 import { open, readdir, realpath, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
 import {
+  FETCH_FILE_CONTENT_LIMIT_MESSAGE,
   MAX_FETCH_CONTENT_BYTES,
   MAX_GITHUB_README_BYTES,
   MAX_GITHUB_TREE_ENTRIES,
@@ -342,11 +343,7 @@ export async function generateCloneContent(
   const content = await readBoundedFile(safePath, MAX_CLONE_FILE_BYTES);
   lines.push(`## ${target}`, content.text);
   if (content.truncated) {
-    lines.push(
-      "",
-      "[File content is limited to 1 MiB.]",
-      `Full file: ${safePath}`,
-    );
+    lines.push("", FETCH_FILE_CONTENT_LIMIT_MESSAGE, `Full file: ${safePath}`);
   }
   lines.push(
     "",

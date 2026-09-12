@@ -84,7 +84,17 @@ test("fetchDocument streams text to a temp file and extracts HTML", async () => 
   );
   try {
     assert.equal(init?.redirect, "follow");
-    assert.equal(new Headers(init?.headers).get("authorization"), null);
+    const headers = new Headers(init?.headers);
+    assert.match(
+      headers.get("user-agent") ?? "",
+      /^Mozilla\/5\.0 \(X11; Linux x86_64\).*Chrome\/152\.0\.0\.0/,
+    );
+    assert.equal(
+      headers.get("accept"),
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    );
+    assert.equal(headers.get("accept-language"), "en-US,en;q=0.9");
+    assert.equal(headers.get("authorization"), null);
     assert.equal(result.text, "Example\nHello world");
     assert.equal(result.title, "Example");
     assert.equal(result.finalUrl, "https://example.test/final");

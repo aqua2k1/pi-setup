@@ -2,6 +2,7 @@ import { chmod, mkdtemp, open, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  FETCH_RESPONSE_SIZE_LIMIT_MESSAGE,
   MAX_FETCH_CONTENT_BYTES,
   TEMP_SPOOL_TTL_MS,
 } from "../shared/limits.ts";
@@ -151,7 +152,7 @@ export async function createTempSpool(
       if (bytes + chunk.byteLength > MAX_FETCH_CONTENT_BYTES) {
         throw new WebFetchError(
           "invalid-response",
-          "The fetch response exceeds the 1 MiB limit.",
+          FETCH_RESPONSE_SIZE_LIMIT_MESSAGE,
         );
       }
       bytes += chunk.byteLength;

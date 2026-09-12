@@ -44,7 +44,7 @@ test("createTempSpool writes bounded response and final content files", async ()
   }
 });
 
-test("createTempSpool rejects a response over 1 MiB", async () => {
+test("createTempSpool rejects a response over 50 MiB", async () => {
   const base = await fixtureDirectory("pi-web-tools-spool-limit-");
   const spool = await createTempSpool(base);
   try {
@@ -106,16 +106,18 @@ test("createTempSpool rejects repeated saveText calls", async () => {
 test("createTempSpool serializes writes and reserves the size limit", async () => {
   const base = await fixtureDirectory("pi-web-tools-spool-concurrent-");
   const spool = await createTempSpool(base);
+  const chunkSize = Math.floor(MAX_FETCH_CONTENT_BYTES / 2) + 1;
+  const chunk = new Uint8Array(chunkSize);
   try {
-    const first = spool.write(new Uint8Array(600 * 1_024));
+    const first = spool.write(chunk);
     await assert.rejects(
-      spool.write(new Uint8Array(600 * 1_024)),
+      spool.write(chunk),
       (error: unknown) =>
         error instanceof WebFetchError && error.code === "invalid-response",
     );
     await first;
-    assert.equal(spool.bytes, 600 * 1_024);
-    assert.equal((await stat(spool.responsePath)).size, 600 * 1_024);
+    assert.equal(spool.bytes, chunkSize);
+    assert.equal((await stat(spool.responsePath)).size, chunkSize);
   } finally {
     await spool.cleanup();
     await rm(base, { recursive: true, force: true });

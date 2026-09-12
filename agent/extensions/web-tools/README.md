@@ -22,7 +22,7 @@ web_fetch
 ```
 
 Successful textual results are always saved to a temporary `content.txt`. The
-final text is limited to 1 MiB. Small results are returned inline; larger
+final text is limited to 50 MiB. Small results are returned inline; larger
 results include a short preview and a path that the model can pass to `read`.
 Temporary files expire after the configured cleanup period.
 

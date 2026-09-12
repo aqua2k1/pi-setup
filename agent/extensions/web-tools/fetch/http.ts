@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { FetchLike } from "../shared/http.ts";
 import {
+  FETCH_RESPONSE_SIZE_LIMIT_MESSAGE,
   MAX_FETCH_CONTENT_BYTES,
   TEMP_SPOOL_TTL_MS,
 } from "../shared/limits.ts";
@@ -14,9 +15,13 @@ import {
 import { createTempSpool } from "./spool.ts";
 import type { FetchRequest, FetchResponse } from "./types.ts";
 
-const USER_AGENT = "pi-web-tools/1.0";
-const ACCEPT =
-  "text/html,application/xhtml+xml,application/xml,text/plain,application/json;q=0.9,*/*;q=0.1";
+const BROWSER_HEADERS = {
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "User-Agent":
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+} as const;
 
 export interface FetchDocumentOptions {
   timeoutMs: number;
@@ -115,10 +120,7 @@ export async function fetchDocument(
     const response = await fetcher(url, {
       method: "GET",
       redirect: "follow",
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: ACCEPT,
-      },
+      headers: BROWSER_HEADERS,
       signal,
     });
     if (!response.ok) {
@@ -143,7 +145,7 @@ export async function fetchDocument(
       await cancelBody(response);
       throw new WebFetchError(
         "invalid-response",
-        "The fetch response exceeds the 1 MiB limit.",
+        FETCH_RESPONSE_SIZE_LIMIT_MESSAGE,
         { source: "native-http" },
       );
     }

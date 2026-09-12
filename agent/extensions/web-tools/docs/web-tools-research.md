@@ -77,7 +77,7 @@ local `gh` CLI. The old `web-search-config.json` format is not read or migrated.
 ## Local persistence
 
 Successful textual results are saved by default. The stored file is bounded to
-1 MiB and expires after the temporary-file TTL. The model receives the full path
+50 MiB and expires after the temporary-file TTL. The model receives the full path
 for later `read` access; large results include only a short inline preview to
 avoid wasting context.
 
@@ -86,7 +86,7 @@ and the host's session/transcript may also retain tool output.
 
 ## Limits and errors
 
-- final fetch text: 1 MiB;
+- final fetch text: 50 MiB;
 - inline preview: 8 KiB;
 - inline output: 50 KiB / 2,000 lines;
 - GitHub tree listing: 200 entries;

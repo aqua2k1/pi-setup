@@ -67,7 +67,7 @@ web_fetch(url, raw)
 │     │  ├─ small repository -> CloneManager -> gh repo clone/git clone
 │     │  └─ large/failing clone -> gh api
 │     └─ fetchDocument()
-│        ├─ Node fetch()
+│        ├─ Node global fetch() with Chrome-style HTTP headers
 │        ├─ follow redirects
 │        ├─ stream response into bounded spool
 │        └─ decodeDocument()
@@ -79,9 +79,10 @@ web_fetch(url, raw)
 ## Native HTTP
 
 Native HTTP uses the Node global `fetch`, not a shell command. It sends a GET
-request with fixed `User-Agent` and `Accept` headers, follows normal HTTP
-redirects, checks the status, and streams the response body to a temporary
-file. A response body larger than 1 MiB is cancelled.
+request with Chrome-style HTTP headers, follows normal HTTP redirects,
+checks the status, and streams the response body to a temporary file. A
+response body larger than 50 MiB is cancelled. The transport remains Node's
+HTTP stack; these headers do not change its TLS or HTTP/2 fingerprint.
 
 The body is decoded as text, JSON, XML or HTML. HTML extraction removes script,
 style, noscript and template blocks, extracts the title, converts block tags to

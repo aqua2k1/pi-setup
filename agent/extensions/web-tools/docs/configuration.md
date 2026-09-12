@@ -82,7 +82,7 @@ export SEARXNG_API_KEY="..."
 | `fetch.github.cloneTimeoutSeconds` | integer | `30` | Clone timeout, range `5`–`600`. |
 | `fetch.github.clonePath` | string | system temp directory | Root directory for shallow clones. |
 
-The final fetched text is always limited to 1 MiB. That hard limit is not
+The final fetched text is always limited to 50 MiB. That hard limit is not
 configurable.
 
 ## GitHub authentication
