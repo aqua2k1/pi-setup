@@ -76,7 +76,7 @@ test("registerWebToolsCommand: exposes status and provider test arguments", () =
   const command = capture();
   assert.deepEqual(
     command.getArgumentCompletions?.("")?.map((completion) => completion.value),
-    ["status", "test searxng", "test codex-alpha-search", "test codex"],
+    ["status", "test searxng", "test codex-alpha-search"],
   );
   assert.deepEqual(
     command
@@ -123,7 +123,7 @@ test("/web-tools configure: is intentionally unavailable", async () => {
   await command.handler("configure", ctx);
 
   assert.deepEqual(notifications, [
-    "/web-tools status\n/web-tools test <searxng|codex-alpha-search|codex>",
+    "/web-tools status\n/web-tools test <searxng|codex-alpha-search>",
   ]);
 });
 

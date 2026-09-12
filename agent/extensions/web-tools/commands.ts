@@ -19,12 +19,7 @@ const PROVIDER_LABELS: Record<WebSearchProviderName, string> = {
   searxng: "SearXNG",
   "codex-alpha-search": "Codex alpha/search",
 };
-const COMMAND_ARGUMENTS = [
-  "status",
-  "test searxng",
-  "test codex-alpha-search",
-  "test codex",
-];
+const COMMAND_ARGUMENTS = ["status", "test searxng", "test codex-alpha-search"];
 const DEFAULT_SEARCH_QUERY = "pi web search connectivity";
 type ConfigSource = "env" | "config" | "default" | "none";
 
@@ -180,7 +175,7 @@ export function registerWebToolsCommand(
           await testProvider(ctx, provider, resolvedConfig, search);
         } else {
           ctx.ui.notify(
-            "/web-tools status\n/web-tools test <searxng|codex-alpha-search|codex>",
+            "/web-tools status\n/web-tools test <searxng|codex-alpha-search>",
             "info",
           );
         }
