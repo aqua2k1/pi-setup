@@ -6,7 +6,7 @@
   "packages": [
     "npm:@gotgenes/pi-subagents",
     "npm:@narumitw/pi-chrome-devtools",
-    "!npm:@juicesharp/rpiv-web-tools"
+    "npm:@juicesharp/rpiv-ask-user-question"
   ],
   "defaultThinkingLevel": "max",
   "modelThinkingLevels": {
