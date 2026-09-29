@@ -4,6 +4,9 @@
       "modelOverrides": {
         "gpt-6-luna": {
           "contextWindow": 1000000
+        },
+        "gpt-5.6-luna": {
+          "contextWindow": 1000000
         }
       }
     }
