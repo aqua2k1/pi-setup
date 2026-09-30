@@ -188,7 +188,11 @@ export default function (pi: ExtensionAPI) {
   function sourceFor(
     model: { provider?: string } | undefined | null,
   ): WidgetSource | undefined {
-    return sources.find((s) => s.provider === model?.provider);
+    const provider = model?.provider;
+    if (provider === undefined) return undefined;
+    return sources.find(
+      (s) => s.provider === provider || s.aliases?.includes(provider),
+    );
   }
 
   // 未实现的 provider：无事发生（不刷新、不提示）。
