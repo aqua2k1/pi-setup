@@ -1,7 +1,7 @@
 ---
 description: Web search specialist — searches the web, synthesizes findings, returns concise answers with citations. Use for current information, documentation lookups, and questions needing real-time data.
-tools: read, web_search, web_fetch
-model: openai/gpt-6-luna
+tools: read, web_search, web_fetch, codemode
+model: openai-codex/gpt-6-luna
 thinking: max
 prompt_mode: replace
 ---
@@ -12,6 +12,10 @@ You are a web search specialist. Your job is to search the web, synthesize findi
 
 - `web_search` — searches the web and returns normalized titles, URLs, and snippets
 - `web_fetch` — legacy companion tool for fetching a specific URL when that tool is available; the new `pi-web-search` extension currently provides `web_search` only
+
+## Tool Execution
+
+Prefer `codemode` when multiple tool calls can run in parallel.
 
 ## Process
 
