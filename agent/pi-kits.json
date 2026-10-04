@@ -1,48 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/aqua2k1/pi-kits/main/pi-kits.schema.json",
-  "workspace": {
-    "enabled": true,
-    "terminal": {
-      "enabled": true,
-      "editor": "vim",
-      "gitUI": "lazygit",
-      "fileManager": "yazi"
-    },
-    "open": {
-      "enabled": true
-    },
-    "preview": {
-      "enabled": true
-    },
-    "contextPreview": {
-      "enabled": true
-    }
-  },
-  "usage": {
-    "enabled": true,
-    "providerUsage": {
-      "enabled": true,
-      "intervalMs": 600000,
-      "timeoutMs": 15000
-    },
-    "stats": {
-      "enabled": true
-    }
-  },
-  "workflow": {
-    "enabled": true,
-    "commit": {
-      "enabled": true,
-      "timeoutMs": 120000,
-      "rememberModel": true,
-      "lastModel": "openai-codex/gpt-6-luna"
-    },
-    "notify": {
-      "enabled": true,
-      "quietPeriodMs": 1000
-    }
-  },
-  "web": {
+  "web-kits": {
     "enabled": true,
     "search": {
       "enabled": true,
@@ -66,5 +24,54 @@
         "cloneTimeoutSeconds": 120
       }
     }
+  },
+  "terminal": {
+    "enabled": true,
+    "editor": "vim",
+    "gitUI": "lazygit",
+    "fileManager": "yazi"
+  },
+  "open": {
+    "enabled": true
+  },
+  "preview": {
+    "enabled": true
+  },
+  "contextPreview": {
+    "enabled": true
+  },
+  "providerUsage": {
+    "enabled": true,
+    "intervalMs": 600000,
+    "timeoutMs": 15000
+  },
+  "stats": {
+    "enabled": true
+  },
+  "subagent": {
+    "enabled": true,
+    "mux": "herdr",
+    "maxConcurrent": 4,
+    "extensionAllowlist": [
+      "builtin:codemode",
+      "builtin:tool-search",
+      "npm:@narumitw/pi-chrome-devtools",
+      {
+        "source": "https://github.com/aqua2k1/pi-kits.git",
+        "extensions": [
+          "web-kits"
+        ]
+      }
+    ]
+  },
+  "commit": {
+    "enabled": true,
+    "timeoutMs": 120000,
+    "rememberModel": true,
+    "lastModel": "openai-codex/gpt-6-luna"
+  },
+  "notify": {
+    "enabled": true,
+    "quietPeriodMs": 1000
   }
 }
