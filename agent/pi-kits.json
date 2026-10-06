@@ -25,12 +25,6 @@
       }
     }
   },
-  "terminal": {
-    "enabled": true,
-    "editor": "vim",
-    "gitUI": "lazygit",
-    "fileManager": "yazi"
-  },
   "open": {
     "enabled": true
   },
