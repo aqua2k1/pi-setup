@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "zotero": {
+      "command": "zotero-mcp",
+      "env": {
+        "ZOTERO_LOCAL": "true",
+        "ZOTERO_BACKEND": "api"
+      },
+      "description": "检索 Zotero 文献、读取论文与研究笔记",
+      "enabled": false
+    }
+  }
+}

@@ -49,6 +49,7 @@
     "extensionAllowlist": [
       "builtin:codemode",
       "builtin:tool-search",
+      "builtin:mcp",
       "npm:@narumitw/pi-chrome-devtools",
       {
         "source": "https://github.com/aqua2k1/pi-kits.git",

@@ -1,3 +1,10 @@
+# bin
+agent/bin/
+agent/install/
+
+# mcp
+agent/mcp.log
+
 # Secrets
 agent/auth.json
 agent/trust.json
