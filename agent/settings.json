@@ -1,11 +1,11 @@
 {
-  "lastChangelogVersion": "1.2.0",
+  "lastChangelogVersion": "1.4.0",
   "theme": "gruvbox",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-6.1-sol",
   "packages": [
     "!npm:@gotgenes/pi-subagents",
-    "npm:@narumitw/pi-chrome-devtools",
+    "!npm:@narumitw/pi-chrome-devtools",
     "!npm:@juicesharp/rpiv-ask-user-question",
     "https://github.com/aqua2k1/pi-kits.git"
   ],
@@ -35,5 +35,9 @@
   "tuiMode": "fullscreen",
   "showCacheMissNotices": true,
   "cacheWarming": "streaming",
-  "deviceId": "c59a1eb8-f442-47ab-a7e8-73edf23be617"
+  "deviceId": "c59a1eb8-f442-47ab-a7e8-73edf23be617",
+  "transport": "auto",
+  "extensions": [
+    "+builtin:tool-search"
+  ]
 }
