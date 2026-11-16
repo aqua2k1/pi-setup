@@ -29,6 +29,7 @@ agent/extensions/copet
 
 # Sessions (transient)
 agent/sessions/
+agent/handoffs/
 pi-acp/
 
 # pi-web-access runtime cache (private, contains fetched content)

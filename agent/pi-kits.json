@@ -1,72 +1,46 @@
 {
   "$schema": "https://raw.githubusercontent.com/aqua2k1/pi-kits/main/pi-kits.schema.json",
-  "web-kits": {
+  "pi-web-kits": {
     "enabled": true,
     "search": {
       "enabled": true,
-      "routing": {
-        "provider": "codex-alpha-search",
-        "fallback": false
+      "sources": {
+        "web": {
+          "enabled": true,
+          "routing": ["codex-alpha-search" ],
+           "codex": {
+              "model": "gpt-6-luna"
+           }
+        },
+        "github": {
+          "enabled": true
+        }
       },
       "timeoutMs": 15000,
-      "maxResults": 10,
-      "codex": {
-        "model": "gpt-6-luna"
-      }
+      "maxResults": 10
     },
     "fetch": {
       "enabled": true,
       "timeoutMs": 15000,
       "github": {
-        "enabled": true,
-        "mode": "auto",
-        "maxRepoSizeMB": 350,
-        "cloneTimeoutSeconds": 120
+        "enabled": true
       }
     }
   },
-  "open": {
-    "enabled": true
-  },
-  "preview": {
-    "enabled": true
-  },
-  "contextPreview": {
-    "enabled": true
-  },
-  "providerUsage": {
+  "pi-subagent": {
     "enabled": true,
-    "intervalMs": 600000,
-    "timeoutMs": 15000
-  },
-  "stats": {
-    "enabled": true
-  },
-  "subagent": {
-    "enabled": true,
-    "mux": "herdr",
     "maxConcurrent": 4,
     "extensionAllowlist": [
       "builtin:codemode",
       "builtin:tool-search",
       "builtin:mcp",
-      "npm:@narumitw/pi-chrome-devtools",
       {
         "source": "https://github.com/aqua2k1/pi-kits.git",
         "extensions": [
-          "web-kits"
+          "pi-web-kits",
+          "pi-ask"
         ]
       }
     ]
-  },
-  "commit": {
-    "enabled": true,
-    "timeoutMs": 120000,
-    "rememberModel": true,
-    "lastModel": "openai-codex/gpt-6-luna"
-  },
-  "notify": {
-    "enabled": true,
-    "quietPeriodMs": 1000
   }
 }
