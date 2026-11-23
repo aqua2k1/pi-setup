@@ -31,6 +31,7 @@ agent/extensions/copet
 agent/sessions/
 agent/handoffs/
 pi-acp/
+agent/crashes.json
 
 # pi-web-access runtime cache (private, contains fetched content)
 web-search-cache/
