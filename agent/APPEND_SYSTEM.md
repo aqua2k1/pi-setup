@@ -9,3 +9,7 @@
 # Bash
 
 - Use `fd` instead of `find`, `rg` instead of `grep`, and `eza` instead of `ls`. Search hidden paths only when relevant, and search ignored paths only when directly required.
+
+# GitHub
+
+- Prefer `gh` (`gh search`, `gh api`, `gh pr view`, `gh issue view`) over raw web scraping when inspecting GitHub repositories, code, issues, or pull requests.
